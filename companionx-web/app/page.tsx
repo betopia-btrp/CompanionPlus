@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
+import JournalMockup from "@/components/journal-mockup";
 import {
   Fingerprint,
   CalendarBlank,
@@ -10,43 +10,55 @@ import {
   Brain,
   Barbell,
   ShieldCheck,
-  ArrowRight,
   Warning,
+  ArrowRightIcon,
 } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 function Nav() {
+  const router = useRouter();
+
   return (
-    <header
-      className={`sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-sm transition-shadow duration-300`}
-    >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-8 md:px-12">
-        <span className="font-heading text-lg font-bold tracking-tight text-foreground uppercase">
+    <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/90 backdrop-blur-md">
+      <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-6 md:px-10 lg:px-12">
+        <span className="font-heading text-xl font-semibold tracking-tight text-foreground">
           CompanionX
         </span>
 
-        <div className="hidden items-center gap-8 font-sans text-sm font-medium tracking-widest uppercase md:flex">
-          {["How it Works", "Features", "Consultants"].map((link) => (
+        <div className="hidden items-center gap-7 font-sans text-[14px] font-medium text-foreground/80 md:flex">
+          {[
+            { label: "How it Works", href: "#how-it-works" },
+            { label: "Features", href: "#features" },
+            { label: "Stories", href: "#testimonials" },
+          ].map((link) => (
             <a
-              key={link}
-              href="#"
-              className="border-b border-transparent pb-0.5 text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-primary"
+              key={link.label}
+              href={link.href}
+              className="border-b border-transparent pb-0.5 transition-colors duration-150 hover:border-primary hover:text-primary"
             >
-              {link}
+              {link.label}
             </a>
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href="/register"
-            className="hidden border border-border px-5 py-2 font-sans text-xs font-semibold tracking-widest text-foreground uppercase transition-colors duration-150 hover:border-primary hover:text-primary md:inline-flex"
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="default"
+            className="hidden px-4 text-sm font-medium md:inline-flex"
+            onClick={() => router.push("/login")}
           >
             Sign In
-          </Link>
-          <button className="bg-primary px-5 py-2 font-sans text-xs font-semibold tracking-widest text-primary-foreground uppercase transition-all duration-100 hover:opacity-90 active:scale-[0.98]">
+          </Button>
+          <Button
+            variant="default"
+            size="default"
+            className="px-4 text-sm font-medium"
+            onClick={() => router.push("/register")}
+          >
             Get Started
-          </button>
+          </Button>
         </div>
       </nav>
     </header>
@@ -56,7 +68,7 @@ function Nav() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero() {
   return (
-    <section className="relative flex min-h-[620px] items-center overflow-hidden border-b border-border">
+    <section className="relative flex min-h-155 items-center overflow-hidden border-b border-border">
       {/* subtle grid bg */}
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-40"
@@ -66,14 +78,14 @@ function Hero() {
             "repeating-linear-gradient(0deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)",
         }}
       />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-100 w-150 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
 
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 px-8 py-20 md:px-12 lg:grid-cols-2">
         {/* Left */}
         <div className="space-y-8">
-          <span className="inline-block border border-primary/30 bg-primary/5 px-3 py-1 font-sans text-[11px] font-semibold tracking-[0.1em] text-primary uppercase">
-            Clinical Wellness · Bangladesh
-          </span>
+          <p className="inline-flex border border-primary/30 bg-primary/5 px-3 py-1 font-sans text-[10px] font-semibold tracking-[0.14em] text-primary uppercase">
+            Trusted by 500+ members worldwide
+          </p>
 
           <h1 className="font-heading text-[42px] leading-[1.15] font-bold text-foreground md:text-[52px]">
             You don&apos;t have to{" "}
@@ -85,56 +97,18 @@ function Hero() {
             journey. Built on technical precision and deep human empathy.
           </p>
 
-          <div className="flex flex-wrap gap-4 pt-2">
-            <button className="inline-flex items-center gap-2 bg-primary px-7 py-3.5 font-sans text-[11px] font-semibold tracking-widest text-primary-foreground uppercase transition-all hover:opacity-90">
-              Find a Consultant <ArrowRight size={14} weight="bold" />
-            </button>
-            <button className="inline-flex items-center gap-2 border border-border px-7 py-3.5 font-sans text-[11px] font-semibold tracking-widest text-foreground uppercase transition-all hover:border-foreground">
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button variant={"default"} size={"lg"} className="px-6 text-sm">
+              Find a Consultant <ArrowRightIcon weight="bold" />
+            </Button>
+            <Button variant={"outline"} size={"lg"} className="px-6 text-sm">
               Start Journaling
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Right — journal mockup */}
-        <div className="relative border border-border bg-card p-8">
-          <div className="absolute h-16 w-16 border-primary/40" />
-          <div className="absolute h-16 w-16 border-primary/40" />
-
-          <p className="mb-5 font-sans text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            Mood Journal · Today
-          </p>
-
-          <div className="mb-5 flex flex-wrap gap-2">
-            {["😊 Happy", "😟 Anxious", "😐 Neutral", "😔 Sad"].map(
-              (chip, i) => (
-                <span
-                  key={chip}
-                  className={`cursor-default border px-3 py-1.5 font-sans text-[12px] font-medium ${
-                    i === 1
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {chip}
-                </span>
-              ),
-            )}
-          </div>
-
-          <div className="mb-5 min-h-[90px] border border-border p-4 font-sans text-[13px] leading-relaxed text-muted-foreground">
-            Feeling a bit overwhelmed with work lately. Hard to focus and I keep
-            second-guessing decisions…
-          </div>
-
-          <div className="border-l-[3px] border-primary bg-primary/5 px-4 py-3">
-            <p className="mb-1 font-sans text-[10px] font-semibold tracking-widest text-primary uppercase">
-              AI Insight
-            </p>
-            <p className="font-sans text-[13px] text-foreground">
-              Anxiety pattern detected over 3 days. 2 exercises recommended.
-            </p>
-          </div>
-        </div>
+        <JournalMockup />
       </div>
     </section>
   );
@@ -193,7 +167,10 @@ function HowItWorks() {
   ];
 
   return (
-    <section className="border-b border-border px-8 py-24 md:px-12">
+    <section
+      id="how-it-works"
+      className="scroll-mt-24 border-b border-border px-8 py-24 md:px-12"
+    >
       <div className="mx-auto max-w-7xl">
         <div className="mb-14 border-l-[3px] border-primary pl-6">
           <h2 className="font-heading text-[30px] font-bold text-foreground">
@@ -207,6 +184,7 @@ function HowItWorks() {
         <div className="grid grid-cols-1 border border-border md:grid-cols-3">
           {steps.map((step, i) => (
             <div
+              key={step.num}
               className={`group h-full p-10 transition-colors duration-200 hover:bg-muted/40 ${
                 i < steps.length - 1
                   ? "border-b border-border md:border-r md:border-b-0"
@@ -259,23 +237,39 @@ function Features() {
   ];
 
   return (
-    <section className="border-b border-border bg-muted/30 px-8 py-24 md:px-12">
+    <section
+      id="features"
+      className="scroll-mt-24 border-b border-border bg-muted/30 px-8 py-24 md:px-12"
+    >
       <div className="mx-auto max-w-7xl">
-        <div className="mb-14 text-center">
-          <h2 className="mb-4 font-heading text-[30px] font-bold text-foreground">
+        <div className="mb-14 text-center md:mb-16">
+          <p className="mb-3 font-sans text-xs text-muted-foreground">
+            Built for real outcomes
+          </p>
+          <h2 className="mb-4 font-heading text-[32px] font-bold text-foreground md:text-[36px]">
             Precision-Engineered Care
           </h2>
-          <div className="mx-auto h-[2px] w-12 bg-primary" />
+          <p className="mx-auto max-w-2xl font-sans text-sm leading-relaxed text-muted-foreground md:text-base">
+            Every layer is intentionally designed — from private sessions to AI
+            guidance — so support feels calm, intelligent, and dependable.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-px bg-border md:grid-cols-2 lg:grid-cols-4">
-          {features.map((f, i) => (
-            <div className="flex h-full flex-col gap-5 bg-card p-8 transition-colors duration-200 hover:bg-primary/[0.03]">
-              <div className="text-primary">{f.icon}</div>
-              <h4 className="font-sans text-[11px] font-bold tracking-[0.1em] text-foreground uppercase">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {features.map((f, index) => (
+            <div
+              key={f.title}
+              className="group relative flex h-full flex-col gap-5 border border-border bg-card p-7 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="border border-border bg-background p-2 text-primary transition-colors group-hover:border-primary/30 group-hover:bg-primary/10">
+                  {f.icon}
+                </div>
+              </div>
+              <h4 className="font-sans text-[15px] font-semibold text-foreground">
                 {f.title}
               </h4>
-              <p className="font-sans text-[14px] leading-relaxed text-muted-foreground">
+              <p className="font-sans text-sm leading-relaxed text-muted-foreground">
                 {f.body}
               </p>
             </div>
@@ -297,8 +291,8 @@ function WhySection() {
   return (
     <section className="border-b border-border bg-background px-8 py-24 md:px-12">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-12 text-center md:grid-cols-4">
-        {items.map((item, i) => (
-          <div>
+        {items.map((item) => (
+          <div key={item.label}>
             <div className="mb-2 font-heading text-[52px] leading-none font-bold text-primary">
               {item.num}
             </div>
@@ -336,7 +330,10 @@ function Testimonials() {
   ];
 
   return (
-    <section className="border-b border-border bg-muted/30 px-8 py-24 md:px-12">
+    <section
+      id="testimonials"
+      className="scroll-mt-24 border-b border-border bg-muted/30 px-8 py-24 md:px-12"
+    >
       <div className="mx-auto max-w-7xl">
         <div className="mb-14 text-center">
           <h2 className="font-heading text-[30px] font-bold text-foreground">
@@ -347,6 +344,7 @@ function Testimonials() {
         <div className="grid grid-cols-1 border border-border md:grid-cols-3">
           {testimonials.map((t, i) => (
             <div
+              key={t.initials}
               className={`flex h-full flex-col justify-between bg-card p-8 ${
                 i < testimonials.length - 1
                   ? "border-b border-border md:border-r md:border-b-0"
@@ -399,6 +397,8 @@ function SafetyBanner() {
 
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 function CTA() {
+  const router = useRouter();
+
   return (
     <section className="border-b border-border bg-foreground px-8 py-20 md:px-12">
       <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-10 md:flex-row">
@@ -411,9 +411,14 @@ function CTA() {
             connection. No real name required at any step.
           </p>
         </div>
-        <button className="shrink-0 bg-primary px-10 py-4 font-sans text-[11px] font-bold tracking-widest whitespace-nowrap text-primary-foreground uppercase transition-all hover:opacity-90 active:scale-[0.98]">
+        <Button
+          size="lg"
+          className="shrink-0 px-8 text-[11px] font-bold tracking-widest whitespace-nowrap uppercase"
+          onClick={() => router.push("/register")}
+        >
           Sign Up For CompanionX
-        </button>
+          <ArrowRightIcon weight="bold" />
+        </Button>
       </div>
     </section>
   );

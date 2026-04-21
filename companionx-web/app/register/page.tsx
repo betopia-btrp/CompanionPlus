@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import SiteFooter from "@/components/site-footer";
 
 export default function RegisterPage() {
   const [identity, setIdentity] = useState<"user" | "consultant">("user");
@@ -67,37 +66,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-sm">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 md:px-12">
-          <Link
-            href="/"
-            className="font-heading text-lg font-bold tracking-tight text-foreground uppercase"
-          >
-            CompanionX
-          </Link>
-
-          <div className="hidden items-center gap-8 font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase md:flex">
-            {["Platform", "Clinical Basis", "Ethics"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="transition-colors hover:text-foreground"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-
-          <Link
-            href="/register"
-            className="font-sans text-xs font-semibold tracking-widest text-foreground uppercase transition-colors hover:text-primary"
-          >
-            Login
-          </Link>
-        </nav>
-      </header>
-
-      <main className="relative flex min-h-[calc(100vh-64px)] items-center justify-center px-6 py-16 md:px-12">
+      <main className="relative flex min-h-screen items-center justify-center px-6 py-16 md:px-12">
         <div
           className="pointer-events-none absolute inset-0 -z-10 opacity-40"
           style={{
@@ -334,7 +303,7 @@ export default function RegisterPage() {
           <p className="text-center font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
             Already have an account?{" "}
             <Link
-              href="/register"
+              href="/login"
               className="font-semibold text-primary hover:opacity-80"
             >
               Sign In
