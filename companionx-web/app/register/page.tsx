@@ -29,8 +29,8 @@ export default function RegisterPage() {
       const response = await api.post("/register", formData);
       // Save token for future requests
       localStorage.setItem("token", response.data.token);
-      // Success! Move to onboarding
-      router.push("/onboarding");
+      // Success! Move to login
+      router.push("/login");
     } catch (error: any) {
       console.error("Registration failed:", error.response?.data || error.message);
       alert(error.response?.data?.message || "Registration failed. Check your details.");
