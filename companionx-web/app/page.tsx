@@ -1,215 +1,438 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Shield, Brain, Heart, Video, CheckCircle2 } from "lucide-react";
+import SiteFooter from "@/components/site-footer";
+import {
+  Fingerprint,
+  CalendarBlank,
+  VideoCamera,
+  EyeSlash,
+  Brain,
+  Barbell,
+  ShieldCheck,
+  ArrowRight,
+  Warning,
+} from "@phosphor-icons/react";
 
-export default function LandingPage() {
+// ─── Nav ─────────────────────────────────────────────────────────────────────
+function Nav() {
   return (
-    <div className="min-h-screen bg-white text-slate-900 selection:bg-blue-100">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="text-2xl font-black tracking-tighter text-blue-600">
-            Companion<span className="text-slate-900">X</span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-            <Link href="#features" className="hover:text-blue-600 transition">
-              How it Works
-            </Link>
-            <Link href="#safety" className="hover:text-blue-600 transition">
-              Safety
-            </Link>
-            <Link href="/login" className="hover:text-blue-600 transition">
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-full hover:bg-blue-700 transition shadow-md shadow-blue-200"
+    <header
+      className={`sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-sm transition-shadow duration-300`}
+    >
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-8 md:px-12">
+        <span className="font-heading text-lg font-bold tracking-tight text-foreground uppercase">
+          CompanionX
+        </span>
+
+        <div className="hidden items-center gap-8 font-sans text-sm font-medium tracking-widest uppercase md:flex">
+          {["How it Works", "Features", "Consultants"].map((link) => (
+            <a
+              key={link}
+              href="#"
+              className="border-b border-transparent pb-0.5 text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-primary"
             >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-50 rounded-full blur-[120px] opacity-60"></div>
-          <div className="absolute bottom-[10%] right-[-5%] w-[30%] h-[30%] bg-indigo-50 rounded-full blur-[100px] opacity-60"></div>
+              {link}
+            </a>
+          ))}
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 mb-8 tracking-tight leading-[1.1]">
-            Your mind matters. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-              Heal anonymously.
-            </span>
-          </h1>
-          <p className="text-lg md:text-xl text-slate-600 mb-12 max-w-2xl mx-auto leading-relaxed">
-            Bangladesh's first AI-powered mental wellness platform. Connect with
-            professional consultants and track your mood in total privacy.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link
-              href="/register"
-              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-full font-bold text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 hover:-translate-y-1 transition-all"
-            >
-              Start Free Journey
-            </Link>
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              No real name required
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Features Grid */}
-      <section id="features" className="py-24 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Crafted for your well-being
-            </h2>
-            <p className="text-slate-500">
-              Every feature is designed with privacy and science in mind.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <FeatureCard
-              icon={<Shield className="w-8 h-8 text-blue-600" />}
-              title="Total Anonymity"
-              description="Register with an avatar. We never ask for your real name in counseling sessions."
-            />
-            <FeatureCard
-              icon={<Brain className="w-8 h-8 text-indigo-600" />}
-              title="AI-Powered Care"
-              description="Get personalized mental exercises and consultant matches based on your mood journal."
-            />
-            <FeatureCard
-              icon={<Video className="w-8 h-8 text-blue-600" />}
-              title="Private Video Calls"
-              description="Secure, browser-based video sessions via Jitsi. No downloads, no footprints."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Section */}
-      <section id="safety" className="py-24">
-        <div className="max-w-5xl mx-auto px-6 bg-blue-600 rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-          <Heart className="w-16 h-16 mx-auto mb-8 opacity-80" />
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">
-            Always Safe. Always Here.
-          </h2>
-          <p className="text-xl text-blue-100 mb-10 max-w-xl mx-auto">
-            Our AI monitors your journal for safety. If things get hard, we
-            alert the right people immediately. You are never alone.
-          </p>
+        <div className="flex items-center gap-3">
           <Link
             href="/register"
-            className="inline-block bg-white text-blue-600 px-10 py-4 rounded-full font-bold text-lg hover:bg-blue-50 transition-all shadow-lg"
+            className="hidden border border-border px-5 py-2 font-sans text-xs font-semibold tracking-widest text-foreground uppercase transition-colors duration-150 hover:border-primary hover:text-primary md:inline-flex"
           >
-            Get Started for Free
+            Sign In
           </Link>
+          <button className="bg-primary px-5 py-2 font-sans text-xs font-semibold tracking-widest text-primary-foreground uppercase transition-all duration-100 hover:opacity-90 active:scale-[0.98]">
+            Get Started
+          </button>
         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-12 border-t border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 text-center text-slate-400 text-sm">
-          <p>
-            © {new Date().getFullYear()} CompanionX. Made with care in
-            Bangladesh.
-          </p>
-        </div>
-      </footer>
-    </div>
+      </nav>
+    </header>
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+function Hero() {
   return (
-    <div className="bg-white p-10 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all group">
-      <div className="mb-6 p-4 bg-slate-50 rounded-2xl w-fit group-hover:bg-blue-50 transition-colors">
-        {icon}
-      </div>
-      <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-      <p className="text-slate-500 leading-relaxed">{description}</p>
-    </div>
-  );
-}
-import Image from "next/image";
+    <section className="relative flex min-h-[620px] items-center overflow-hidden border-b border-border">
+      {/* subtle grid bg */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 opacity-40"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)," +
+            "repeating-linear-gradient(0deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)",
+        }}
+      />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
 
-export function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 px-8 py-20 md:px-12 lg:grid-cols-2">
+        {/* Left */}
+        <div className="space-y-8">
+          <span className="inline-block border border-primary/30 bg-primary/5 px-3 py-1 font-sans text-[11px] font-semibold tracking-[0.1em] text-primary uppercase">
+            Clinical Wellness · Bangladesh
+          </span>
+
+          <h1 className="font-heading text-[42px] leading-[1.15] font-bold text-foreground md:text-[52px]">
+            You don&apos;t have to{" "}
+            <span className="text-primary">face it alone.</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p className="max-w-md font-sans text-[17px] leading-relaxed text-muted-foreground">
+            Professional, anonymous mental wellness support for a stigma-free
+            journey. Built on technical precision and deep human empathy.
+          </p>
+
+          <div className="flex flex-wrap gap-4 pt-2">
+            <button className="inline-flex items-center gap-2 bg-primary px-7 py-3.5 font-sans text-[11px] font-semibold tracking-widest text-primary-foreground uppercase transition-all hover:opacity-90">
+              Find a Consultant <ArrowRight size={14} weight="bold" />
+            </button>
+            <button className="inline-flex items-center gap-2 border border-border px-7 py-3.5 font-sans text-[11px] font-semibold tracking-widest text-foreground uppercase transition-all hover:border-foreground">
+              Start Journaling
+            </button>
+          </div>
+        </div>
+
+        {/* Right — journal mockup */}
+        <div className="relative border border-border bg-card p-8">
+          <div className="absolute h-16 w-16 border-primary/40" />
+          <div className="absolute h-16 w-16 border-primary/40" />
+
+          <p className="mb-5 font-sans text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
+            Mood Journal · Today
+          </p>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            {["😊 Happy", "😟 Anxious", "😐 Neutral", "😔 Sad"].map(
+              (chip, i) => (
+                <span
+                  key={chip}
+                  className={`cursor-default border px-3 py-1.5 font-sans text-[12px] font-medium ${
+                    i === 1
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {chip}
+                </span>
+              ),
+            )}
+          </div>
+
+          <div className="mb-5 min-h-[90px] border border-border p-4 font-sans text-[13px] leading-relaxed text-muted-foreground">
+            Feeling a bit overwhelmed with work lately. Hard to focus and I keep
+            second-guessing decisions…
+          </div>
+
+          <div className="border-l-[3px] border-primary bg-primary/5 px-4 py-3">
+            <p className="mb-1 font-sans text-[10px] font-semibold tracking-widest text-primary uppercase">
+              AI Insight
+            </p>
+            <p className="font-sans text-[13px] text-foreground">
+              Anxiety pattern detected over 3 days. 2 exercises recommended.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Stats Bar ────────────────────────────────────────────────────────────────
+function StatsBar() {
+  const stats = [
+    { num: "100%", label: "Anonymous Sessions" },
+    { num: "60s", label: "Safety Alert SLA" },
+    { num: "5+", label: "AI Exercises / Week" },
+    { num: "24/7", label: "Active Support" },
+  ];
+  return (
+    <div className="grid grid-cols-2 border-b border-border md:grid-cols-4">
+      {stats.map((s, i) => (
+        <div
+          key={s.label}
+          className={`px-10 py-7 ${
+            i < stats.length - 1 ? "border-r border-border" : ""
+          }`}
+        >
+          <div className="font-heading text-3xl font-bold text-primary">
+            {s.num}
+          </div>
+          <div className="mt-1 font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+            {s.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── How It Works ─────────────────────────────────────────────────────────────
+function HowItWorks() {
+  const steps = [
+    {
+      num: "01",
+      icon: <Fingerprint size={32} weight="thin" />,
+      title: "Register Anonymously",
+      body: "Secure your identity with our zero-knowledge protocol. Your privacy is our foundational architectural pillar.",
+    },
+    {
+      num: "02",
+      icon: <CalendarBlank size={32} weight="thin" />,
+      title: "Book a Consultant",
+      body: "Select from our vetted network of clinical experts ranked by compatibility with your unique mood profile.",
+    },
+    {
+      num: "03",
+      icon: <VideoCamera size={32} weight="thin" />,
+      title: "Join a Private Session",
+      body: "Connect through encrypted Jitsi video in a safe, controlled digital environment built for healing.",
+    },
+  ];
+
+  return (
+    <section className="border-b border-border px-8 py-24 md:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-14 border-l-[3px] border-primary pl-6">
+          <h2 className="font-heading text-[30px] font-bold text-foreground">
+            How It Works
+          </h2>
+          <p className="mt-1 font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+            The Structured Journey to Wellbeing
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="grid grid-cols-1 border border-border md:grid-cols-3">
+          {steps.map((step, i) => (
+            <div
+              className={`group h-full p-10 transition-colors duration-200 hover:bg-muted/40 ${
+                i < steps.length - 1
+                  ? "border-b border-border md:border-r md:border-b-0"
+                  : ""
+              }`}
+            >
+              <div className="mb-8 flex items-center justify-between">
+                <span className="text-primary">{step.icon}</span>
+                <span className="font-heading text-[56px] leading-none font-bold text-border transition-colors select-none group-hover:text-primary/10">
+                  {step.num}
+                </span>
+              </div>
+              <h3 className="mb-3 font-heading text-[20px] font-bold text-foreground">
+                {step.title}
+              </h3>
+              <p className="font-sans text-[14px] leading-relaxed text-muted-foreground">
+                {step.body}
+              </p>
+            </div>
+          ))}
         </div>
-      </main>
+      </div>
+    </section>
+  );
+}
+
+// ─── Features ─────────────────────────────────────────────────────────────────
+function Features() {
+  const features = [
+    {
+      icon: <EyeSlash size={22} weight="thin" />,
+      title: "Anonymous Video",
+      body: "Face-to-face connection without compromising your personal identity data. UUID-named Jitsi rooms.",
+    },
+    {
+      icon: <Brain size={22} weight="thin" />,
+      title: "AI Mood Journaling",
+      body: "Intelligent sentiment analysis that tracks your progress through linguistic patterns asynchronously.",
+    },
+    {
+      icon: <Barbell size={22} weight="thin" />,
+      title: "Personalized Exercises",
+      body: "Clinical-grade coping tasks tailored to your last 7 days of mood data. Regenerated on every visit.",
+    },
+    {
+      icon: <ShieldCheck size={22} weight="thin" />,
+      title: "Safe & Confidential",
+      body: "Suicidal ideation detection with a 60-second admin alert SLA. Zero PII exposed at any step.",
+    },
+  ];
+
+  return (
+    <section className="border-b border-border bg-muted/30 px-8 py-24 md:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-14 text-center">
+          <h2 className="mb-4 font-heading text-[30px] font-bold text-foreground">
+            Precision-Engineered Care
+          </h2>
+          <div className="mx-auto h-[2px] w-12 bg-primary" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-px bg-border md:grid-cols-2 lg:grid-cols-4">
+          {features.map((f, i) => (
+            <div className="flex h-full flex-col gap-5 bg-card p-8 transition-colors duration-200 hover:bg-primary/[0.03]">
+              <div className="text-primary">{f.icon}</div>
+              <h4 className="font-sans text-[11px] font-bold tracking-[0.1em] text-foreground uppercase">
+                {f.title}
+              </h4>
+              <p className="font-sans text-[14px] leading-relaxed text-muted-foreground">
+                {f.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Why CompanionX ───────────────────────────────────────────────────────────
+function WhySection() {
+  const items = [
+    { num: "100%", label: "Anonymous" },
+    { num: "AI", label: "Powered Care" },
+    { num: "500+", label: "Licensed Experts" },
+    { num: "24/7", label: "Active Support" },
+  ];
+  return (
+    <section className="border-b border-border bg-background px-8 py-24 md:px-12">
+      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-12 text-center md:grid-cols-4">
+        {items.map((item, i) => (
+          <div>
+            <div className="mb-2 font-heading text-[52px] leading-none font-bold text-primary">
+              {item.num}
+            </div>
+            <div className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              {item.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ─── Testimonials ─────────────────────────────────────────────────────────────
+function Testimonials() {
+  const testimonials = [
+    {
+      initials: "A.J.",
+      quote:
+        "The anonymity allowed me to speak my truth without fear of societal repercussions. A truly clinical approach.",
+      since: "Member since 2022",
+    },
+    {
+      initials: "L.K.",
+      quote:
+        "The journaling AI picked up on patterns I hadn't even noticed. It's like having a technical blueprint for my mind.",
+      since: "Member since 2023",
+    },
+    {
+      initials: "S.R.",
+      quote:
+        "Reliable, stable, and quiet. CompanionX doesn't shout — it supports with precision and care.",
+      since: "Member since 2023",
+    },
+  ];
+
+  return (
+    <section className="border-b border-border bg-muted/30 px-8 py-24 md:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-14 text-center">
+          <h2 className="font-heading text-[30px] font-bold text-foreground">
+            Voices of Progress
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 border border-border md:grid-cols-3">
+          {testimonials.map((t, i) => (
+            <div
+              className={`flex h-full flex-col justify-between bg-card p-8 ${
+                i < testimonials.length - 1
+                  ? "border-b border-border md:border-r md:border-b-0"
+                  : ""
+              }`}
+            >
+              <p className="mb-8 font-heading text-[16px] leading-relaxed text-muted-foreground italic">
+                &ldquo;{t.quote}&rdquo;
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center border border-primary font-sans text-[11px] font-bold text-primary">
+                  {t.initials}
+                </div>
+                <span className="font-sans text-[10px] tracking-widest text-muted-foreground uppercase">
+                  {t.since}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Safety Banner ────────────────────────────────────────────────────────────
+function SafetyBanner() {
+  return (
+    <div className="mx-8 my-10 md:mx-12">
+      <div className="flex items-start gap-5 border border-destructive/30 bg-destructive/5 p-6">
+        <Warning
+          size={20}
+          weight="thin"
+          className="mt-0.5 shrink-0 text-destructive"
+        />
+        <div>
+          <h3 className="mb-1 font-heading text-[16px] font-bold text-foreground">
+            Your safety is a system requirement, not a feature.
+          </h3>
+          <p className="font-sans text-[13px] leading-relaxed text-muted-foreground">
+            Suicidal ideation detection runs on a priority queue with a
+            60-second admin alert SLA — using only your internal ID, never your
+            name or email.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CTA ─────────────────────────────────────────────────────────────────────
+function CTA() {
+  return (
+    <section className="border-b border-border bg-foreground px-8 py-20 md:px-12">
+      <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-10 md:flex-row">
+        <div>
+          <h2 className="mb-3 font-heading text-[36px] leading-tight font-bold text-background">
+            Take the first step today.
+          </h2>
+          <p className="max-w-md font-sans text-[15px] leading-relaxed text-background/60">
+            Your journey toward mental wellness begins with a single, private
+            connection. No real name required at any step.
+          </p>
+        </div>
+        <button className="shrink-0 bg-primary px-10 py-4 font-sans text-[11px] font-bold tracking-widest whitespace-nowrap text-primary-foreground uppercase transition-all hover:opacity-90 active:scale-[0.98]">
+          Sign Up For CompanionX
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-background text-foreground antialiased">
+      <Nav />
+      <Hero />
+      <StatsBar />
+      <HowItWorks />
+      <Features />
+      <WhySection />
+      <Testimonials />
+      <SafetyBanner />
+      <CTA />
+      <SiteFooter />
     </div>
   );
 }
