@@ -83,7 +83,7 @@ function Hero() {
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 px-8 py-20 md:px-12 lg:grid-cols-2">
         {/* Left */}
         <div className="space-y-8">
-          <p className="inline-flex border border-primary/30 bg-primary/5 px-3 py-1 font-sans text-[10px] font-semibold tracking-[0.14em] text-primary uppercase">
+          <p className="inline-flex border border-primary/30 bg-primary/5 px-3 py-1 font-sans text-[10px] font-semibold tracking-[0.14em] text-primary">
             Trusted by 500+ members worldwide
           </p>
 
@@ -134,7 +134,7 @@ function StatsBar() {
           <div className="font-heading text-3xl font-bold text-primary">
             {s.num}
           </div>
-          <div className="mt-1 font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+          <div className="mt-1 font-sans text-xs text-muted-foreground">
             {s.label}
           </div>
         </div>
@@ -176,7 +176,7 @@ function HowItWorks() {
           <h2 className="font-heading text-[30px] font-bold text-foreground">
             How It Works
           </h2>
-          <p className="mt-1 font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+          <p className="mt-1 font-sans text-xs text-muted-foreground">
             The Structured Journey to Wellbeing
           </p>
         </div>
@@ -296,7 +296,7 @@ function WhySection() {
             <div className="mb-2 font-heading text-[52px] leading-none font-bold text-primary">
               {item.num}
             </div>
-            <div className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+            <div className="font-sans text-xs text-muted-foreground">
               {item.label}
             </div>
           </div>
@@ -355,10 +355,10 @@ function Testimonials() {
                 &ldquo;{t.quote}&rdquo;
               </p>
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center border border-primary font-sans text-[11px] font-bold text-primary">
+                <div className="flex h-9 w-9 items-center justify-center border border-primary font-sans text-xs font-bold text-primary">
                   {t.initials}
                 </div>
-                <span className="font-sans text-[10px] tracking-widest text-muted-foreground uppercase">
+                <span className="font-sans text-[10px] text-muted-foreground">
                   {t.since}
                 </span>
               </div>
@@ -413,7 +413,7 @@ function CTA() {
         </div>
         <Button
           size="lg"
-          className="shrink-0 px-8 text-[11px] font-bold tracking-widest whitespace-nowrap uppercase"
+          className="shrink-0 px-8 text-xs font-bold whitespace-nowrap"
           onClick={() => router.push("/register")}
         >
           Sign Up For CompanionX
