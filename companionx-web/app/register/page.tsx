@@ -75,9 +75,9 @@ export default function RegisterPage() {
               "repeating-linear-gradient(0deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)",
           }}
         />
-        <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[420px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
+        <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-105 w-160 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
 
-        <div className="relative w-full max-w-[560px] border border-border bg-card p-8 md:p-10">
+        <div className="relative w-full max-w-140 border border-border bg-card p-8 md:p-10">
           <div className="mb-8">
             <h1 className="font-heading text-3xl font-bold text-foreground md:text-[34px]">
               Create Your Anonymous Account
