@@ -89,14 +89,14 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Identity Selection
               </label>
               <div className="mt-2 grid grid-cols-2 border border-border">
                 <button
                   type="button"
                   onClick={() => setIdentity("user")}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-colors ${
                     identity === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-background text-muted-foreground hover:text-foreground"
@@ -107,7 +107,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setIdentity("consultant")}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-colors ${
                     identity === "consultant"
                       ? "bg-primary text-primary-foreground"
                       : "bg-background text-muted-foreground hover:text-foreground"
@@ -120,26 +120,24 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   First Name
                 </label>
                 <Input
                   type="text"
                   required
-                  className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                   onChange={(e) =>
                     setFormData({ ...formData, first_name: e.target.value })
                   }
                 />
               </div>
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   Last Name
                 </label>
                 <Input
                   type="text"
                   required
-                  className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                   onChange={(e) =>
                     setFormData({ ...formData, last_name: e.target.value })
                   }
@@ -148,13 +146,12 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Clinical Email
               </label>
               <Input
                 type="email"
                 required
-                className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
@@ -162,13 +159,12 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Contact Phone
               </label>
               <Input
                 type="text"
                 required
-                className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
@@ -177,26 +173,24 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   Secure Password
                 </label>
                 <Input
                   type="password"
                   required
-                  className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
                 />
               </div>
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   Confirm Password
                 </label>
                 <Input
                   type="password"
                   required
-                  className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -209,7 +203,7 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   Date of Birth
                 </label>
                 <Popover>
@@ -218,7 +212,8 @@ export default function RegisterPage() {
                       <Button
                         variant={"outline"}
                         data-empty={!date}
-                        className="mt-2 w-full h-11 px-4 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground"
+                        size={"lg"}
+                        className={"w-full"}
                       >
                         {date ? format(date, "PPP") : <span>Pick a date</span>}
                         <ChevronDownIcon data-icon="inline-end" />
@@ -244,7 +239,7 @@ export default function RegisterPage() {
                 </Popover>
               </div>
               <div>
-                <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+                <label className="font-sans text-muted-foreground">
                   Gender
                 </label>
                 <Select
@@ -256,7 +251,7 @@ export default function RegisterPage() {
                     }))
                   }
                 >
-                  <SelectTrigger className="mt-2 w-full h-11 border border-border bg-background px-4 text-sm">
+                  <SelectTrigger className="w-full h-11 border border-border bg-background px-4">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -272,35 +267,35 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Guardian Contact (Emergency)
               </label>
               <Input
                 type="text"
                 required
-                className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                 onChange={(e) =>
                   setFormData({ ...formData, guardian_contact: e.target.value })
                 }
               />
             </div>
 
-            <button
+            <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary px-6 py-4 font-sans text-[11px] font-semibold tracking-widest text-primary-foreground uppercase transition-all hover:opacity-90 disabled:opacity-60"
+              className={"w-full"}
+              size="lg"
             >
-              {loading ? "Initializing..." : "Initialize Registration"}
-            </button>
+              {loading ? "Registering..." : "Register"}
+            </Button>
           </form>
 
           <div className="my-6 flex items-center gap-4 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-sans tracking-widest uppercase">Or</span>
+            <span className="font-sans">Or</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <p className="text-center font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+          <p className="text-center font-sans text-xs text-muted-foreground">
             Already have an account?{" "}
             <Link
               href="/login"
@@ -311,7 +306,7 @@ export default function RegisterPage() {
           </p>
 
           <div className="mt-8 border-t border-border pt-6">
-            <p className="font-sans text-xs font-semibold tracking-widest text-foreground uppercase">
+            <p className="font-sans text-xs font-semibold text-foreground">
               Privacy Aligned
             </p>
             <p className="mt-2 font-sans text-xs leading-relaxed text-muted-foreground">

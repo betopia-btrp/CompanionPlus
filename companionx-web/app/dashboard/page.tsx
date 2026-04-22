@@ -22,19 +22,27 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return <div className="p-20 text-center">Analysing your profile...</div>;
+  if (loading)
+    return <div className="p-20 text-center">Analysing your profile...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12">
       <div className="max-w-6xl mx-auto">
         <header className="mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Welcome back!</h1>
-          <p className="text-slate-500 text-lg">Here are your personalized matches based on your onboarding answers.</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            Welcome back!
+          </h1>
+          <p className="text-slate-500 text-lg">
+            Here are your personalized matches based on your onboarding answers.
+          </p>
         </header>
 
         <div className="grid md:grid-cols-2 gap-8">
           {recommendations.map((consultant: any) => (
-            <div key={consultant.id} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
+            <div
+              key={consultant.id}
+              className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group"
+            >
               <div className="flex items-start justify-between mb-6">
                 <div className="bg-blue-100 p-4 rounded-2xl">
                   <User className="w-8 h-8 text-blue-600" />
@@ -48,22 +56,32 @@ export default function Dashboard() {
               <h3 className="text-2xl font-bold text-slate-900 mb-1">
                 {consultant.user.first_name} {consultant.user.last_name}
               </h3>
-              <p className="text-blue-600 font-semibold mb-4">{consultant.specialization}</p>
-              
+              <p className="text-blue-600 font-semibold mb-4">
+                {consultant.specialization}
+              </p>
+
               <div className="bg-blue-50 p-4 rounded-2xl mb-6">
                 <div className="flex gap-2 mb-1">
-                    <MessageSquare className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Why we matched you</span>
+                  <MessageSquare className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold text-blue-400 tracking-wider">
+                    Why we matched you
+                  </span>
                 </div>
-                <p className="text-slate-700 italic">"{consultant.match_reason}"</p>
+                <p className="text-slate-700 italic">
+                  "{consultant.match_reason}"
+                </p>
               </div>
 
-              <p className="text-slate-500 text-sm mb-8 line-clamp-2">{consultant.bio}</p>
+              <p className="text-slate-500 text-sm mb-8 line-clamp-2">
+                {consultant.bio}
+              </p>
 
               <div className="flex items-center justify-between">
                 <div>
-                    <span className="text-2xl font-black text-slate-900">৳{consultant.base_rate_bdt}</span>
-                    <span className="text-slate-400 text-sm"> / session</span>
+                  <span className="text-2xl font-black text-slate-900">
+                    ৳{consultant.base_rate_bdt}
+                  </span>
+                  <span className="text-slate-400 text-sm"> / session</span>
                 </div>
                 <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors">
                   Book Session <ArrowRight className="w-4 h-4" />

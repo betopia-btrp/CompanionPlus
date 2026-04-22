@@ -59,25 +59,23 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Clinical Email
               </label>
               <Input
                 type="email"
                 required
-                className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div>
-              <label className="font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+              <label className="font-sans text-muted-foreground">
                 Secure Password
               </label>
               <Input
                 type="password"
                 required
-                className="mt-2 h-11 w-full border border-border bg-background px-4 text-sm"
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
@@ -85,19 +83,20 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="h-11 w-full text-[11px] font-semibold tracking-widest uppercase"
+              size="lg"
+              className={"w-full"}
             >
-              {loading ? "Signing In..." : "Initialize Session"}
+              {loading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
 
           <div className="my-6 flex items-center gap-4 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-sans tracking-widest uppercase">Or</span>
+            <span className="font-sans">Or</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <p className="text-center font-sans text-[11px] tracking-widest text-muted-foreground uppercase">
+          <p className="text-center font-sans text-xs text-muted-foreground">
             New here?{" "}
             <Link
               href="/register"
@@ -106,16 +105,6 @@ export default function LoginPage() {
               Create Account
             </Link>
           </p>
-
-          <div className="mt-8 border-t border-border pt-6">
-            <p className="font-sans text-xs font-semibold tracking-widest text-foreground uppercase">
-              Privacy Aligned
-            </p>
-            <p className="mt-2 font-sans text-xs leading-relaxed text-muted-foreground">
-              Your sessions remain anonymous by design. All data is encrypted
-              and processed with clinical-grade safeguards.
-            </p>
-          </div>
         </div>
       </main>
     </div>
