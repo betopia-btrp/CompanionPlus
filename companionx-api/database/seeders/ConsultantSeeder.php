@@ -27,31 +27,31 @@ class ConsultantSeeder extends Seeder
 
         foreach ($consultants as $index => $c) {
             DB::transaction(function () use ($c, $index) {
-                // 1. Create the User
                 $names = explode(' ', $c['name']);
-                $user = User::create([
+                $user = User::updateOrCreate([
+                    'email' => "consultant{$index}@companionx.com",
+                ], [
                     'first_name' => $names[0],
                     'last_name' => $names[1] ?? 'Consultant',
-                    'email' => "consultant{$index}@companionx.com",
                     'password' => Hash::make('password123'),
-                    'phone' => '017' . str_pad($index, 8, '0', STR_PAD_LEFT), // Unique phone number
+                    'phone' => '018' . str_pad($index + 1, 8, '0', STR_PAD_LEFT),
                     'dob' => '1985-01-01',
                     'gender' => 'other',
                     'system_role' => 'consultant',
                 ]);
 
-                // 2. Create the Profile (Capture the profile instance)
-                $profile = ConsultantProfile::create([
+                $profile = ConsultantProfile::updateOrCreate([
                     'user_id' => $user->id,
+                ], [
                     'specialization' => $c['special'],
                     'bio' => $c['bio'],
                     'base_rate_bdt' => rand(800, 2000),
                     'is_approved' => true,
                 ]);
 
-                // 3. Create the Wallet using the Profile ID to avoid Foreign Key errors
-                DB::table('consultant_wallets')->insert([
-                    'consultant_id' => $profile->id, 
+                DB::table('consultant_wallets')->updateOrInsert([
+                    'consultant_id' => $profile->id,
+                ], [
                     'balance_bdt' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),
