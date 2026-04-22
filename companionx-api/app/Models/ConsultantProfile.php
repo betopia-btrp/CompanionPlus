@@ -7,9 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConsultantProfile extends Model
 {
-    protected $fillable = ['user_id', 'specialization', 'bio', 'base_rate_bdt', 'is_approved', 'average_rating'];
+    protected $table = 'consultant_profiles';
 
-    // THIS IS THE MISSING PIECE
+    protected $fillable = [
+        'user_id', 
+        'specialization', 
+        'bio', 
+        'base_rate_bdt', 
+        'is_approved', 
+        'average_rating'
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
