@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
@@ -35,13 +36,13 @@ class AuthController extends Controller
             'system_role' => 'patient', 
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        Auth::login($user);
+        $request->session()->regenerate();
 
         return response()->json([
             'user' => $user,
-            'token' => $token,
         ], 201);
-    } // This bracket was missing!
+    }
 
     public function login(Request $request)
     {
@@ -50,25 +51,32 @@ class AuthController extends Controller
             'password' => 'required|string'
         ]);
 
-        $user = User::where('email', $fields['email'])->first();
-
-        if (!$user || !Hash::check($fields['password'], $user->password)) {
+        if (!Auth::attempt($fields, true)) {
             return response([
                 'message' => 'Invalid credentials'
             ], 401);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $request->session()->regenerate();
+
+        $user = $request->user();
 
         return response([
             'user' => $user,
-            'token' => $token
         ], 200);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
         return response(['message' => 'Logged out'], 200);
+    }
+
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
     }
 }

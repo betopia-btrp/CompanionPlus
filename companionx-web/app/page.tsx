@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import JournalMockup from "@/components/journal-mockup";
@@ -14,10 +15,19 @@ import {
   ArrowRightIcon,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { fetchCurrentUser, type AuthUser } from "@/lib/auth";
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 function Nav() {
   const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    fetchCurrentUser().then(setUser);
+  }, []);
+
+  const avatarLabel =
+    `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.trim() || "U";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/90 backdrop-blur-md">
@@ -43,22 +53,36 @@ function Nav() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="default"
-            className="hidden px-4 text-sm font-medium md:inline-flex"
-            onClick={() => router.push("/login")}
-          >
-            Sign In
-          </Button>
-          <Button
-            variant="default"
-            size="default"
-            className="px-4 text-sm font-medium"
-            onClick={() => router.push("/register")}
-          >
-            Get Started
-          </Button>
+          {user ? (
+            <Button
+              variant="outline"
+              size="default"
+              className="h-10 w-10 rounded-full px-0 text-sm font-semibold"
+              onClick={() => router.push("/dashboard")}
+              aria-label="Go to dashboard"
+            >
+              {avatarLabel}
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="default"
+                className="hidden px-4 text-sm font-medium md:inline-flex"
+                onClick={() => router.push("/login")}
+              >
+                Sign In
+              </Button>
+              <Button
+                variant="default"
+                size="default"
+                className="px-4 text-sm font-medium"
+                onClick={() => router.push("/register")}
+              >
+                Get Started
+              </Button>
+            </>
+          )}
         </div>
       </nav>
     </header>
