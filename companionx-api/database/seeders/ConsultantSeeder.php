@@ -13,16 +13,16 @@ class ConsultantSeeder extends Seeder
     public function run(): void
     {
         $consultants = [
-            ['name' => 'Dr. Ariful Islam', 'special' => 'Clinical Psychologist', 'bio' => 'Expert in CBT and clinical depression. 10 years experience in hospital settings.'],
-            ['name' => 'Sabrina Hassan', 'special' => 'Student Counselor', 'bio' => 'Specializes in academic pressure, exam anxiety, and student life transitions.'],
-            ['name' => 'Farhan Chowdhury', 'special' => 'Career Coach', 'bio' => 'Helping young professionals navigate workplace stress and career burnout.'],
-            ['name' => 'Dr. Nusrat Jahan', 'special' => 'Family Therapist', 'bio' => 'Focuses on relationship issues, family dynamics, and social anxiety.'],
-            ['name' => 'Tanvir Ahmed', 'special' => 'Stress Management', 'bio' => 'Uses mindfulness and action-oriented tools to manage daily stress and panic.'],
-            ['name' => 'Laila Rahman', 'special' => 'Trauma Specialist', 'bio' => 'Certified in deep-dive therapy for past trauma and long-term emotional recovery.'],
-            ['name' => 'Imtiaz Hossain', 'special' => 'Addiction Counselor', 'bio' => 'Specialized in habit breaking and behavioral therapy for addiction.'],
-            ['name' => 'Sonia Mirza', 'special' => 'Self-Esteem Coach', 'bio' => 'Passionate about helping people build confidence and personal growth.'],
-            ['name' => 'Dr. Kamal Uddin', 'special' => 'Senior Psychiatrist', 'bio' => 'Holistic approach to mood disorders and severe anxiety cases.'],
-            ['name' => 'Nabila Islam', 'special' => 'Grief Counselor', 'bio' => 'Empathetic listening and support for those dealing with loss and grief.'],
+            ['name' => 'Dr. Ariful Islam', 'special' => 'Clinical Psychologist', 'bio' => 'Expert in CBT and clinical depression.'],
+            ['name' => 'Sabrina Hassan', 'special' => 'Student Counselor', 'bio' => 'Specializes in academic pressure and exam anxiety.'],
+            ['name' => 'Farhan Chowdhury', 'special' => 'Career Coach', 'bio' => 'Helping young professionals navigate workplace stress.'],
+            ['name' => 'Dr. Nusrat Jahan', 'special' => 'Family Therapist', 'bio' => 'Focuses on relationship issues and family dynamics.'],
+            ['name' => 'Tanvir Ahmed', 'special' => 'Stress Management', 'bio' => 'Uses mindfulness tools to manage daily stress.'],
+            ['name' => 'Laila Rahman', 'special' => 'Trauma Specialist', 'bio' => 'Certified in therapy for emotional recovery.'],
+            ['name' => 'Imtiaz Hossain', 'special' => 'Addiction Counselor', 'bio' => 'Specialized in habit breaking and behavioral therapy.'],
+            ['name' => 'Sonia Mirza', 'special' => 'Self-Esteem Coach', 'bio' => 'Passionate about helping people build confidence.'],
+            ['name' => 'Dr. Kamal Uddin', 'special' => 'Senior Psychiatrist', 'bio' => 'Holistic approach to mood disorders.'],
+            ['name' => 'Nabila Islam', 'special' => 'Grief Counselor', 'bio' => 'Support for those dealing with loss and grief.'],
         ];
 
         foreach ($consultants as $index => $c) {
@@ -31,27 +31,27 @@ class ConsultantSeeder extends Seeder
                 $names = explode(' ', $c['name']);
                 $user = User::create([
                     'first_name' => $names[0],
-                    'last_name' => isset($names[1]) ? $names[1] : 'Consultant',
-                    'email' => 'consultant' . ($index + 1) . '@companionx.com',
+                    'last_name' => $names[1] ?? 'Consultant',
+                    'email' => "consultant{$index}@companionx.com",
                     'password' => Hash::make('password123'),
-                    'phone' => '017000000' . $index,
+                    'phone' => '017' . str_pad($index, 8, '0', STR_PAD_LEFT), // Unique phone number
                     'dob' => '1985-01-01',
                     'gender' => 'other',
                     'system_role' => 'consultant',
                 ]);
 
-                // 2. Create the Profile
-                ConsultantProfile::create([
+                // 2. Create the Profile (Capture the profile instance)
+                $profile = ConsultantProfile::create([
                     'user_id' => $user->id,
                     'specialization' => $c['special'],
                     'bio' => $c['bio'],
-                    'base_rate_bdt' => rand(800, 2000), // Random rate between 800-2000
+                    'base_rate_bdt' => rand(800, 2000),
                     'is_approved' => true,
                 ]);
 
-                // 3. Create the Wallet (for the 90% payout rule)
+                // 3. Create the Wallet using the Profile ID to avoid Foreign Key errors
                 DB::table('consultant_wallets')->insert([
-                    'consultant_id' => $user->id, // Usually linked to profile id, adjust if needed
+                    'consultant_id' => $profile->id, 
                     'balance_bdt' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),

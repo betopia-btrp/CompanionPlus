@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: "/up",
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // --- ADD THIS BLOCK ---
+        $middleware->alias([
+            'patient' => \App\Http\Middleware\EnsureUserIsPatient::class,
+        ]);
+        // ----------------------
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

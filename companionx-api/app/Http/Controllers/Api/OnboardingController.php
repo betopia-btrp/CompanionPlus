@@ -4,58 +4,53 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\OnboardingAnswer;
-use App\Models\AiRecommendation; // Import this
-use App\Models\User;
-use App\Services\MatchingService; // Import the service
-use Illuminate\Http\Request;
+use App\Models\AiRecommendation;  // <--- IS THIS HERE?
+use App\Services\MatchingService; // <--- IS THIS HERE?
+use Illuminate\Http\Request;;
 
 class OnboardingController extends Controller
 {
-    public function store(Request $request)
-    {
-        $request->validate([
-            'answers' => 'required|array'
-        ]);
+   public function store(Request $request)
+{
+    try {
+        $request->validate(['answers' => 'required|array']);
+        $user = $request->user();
 
-        $userId = $request->user()->id;
-
-        // 1. Save the 10 answers
+        // 1. Always save the answers first (This part works)
         foreach ($request->answers as $key => $value) {
-            OnboardingAnswer::create([
-                'user_id' => $userId,
-                'question_key' => $key,
-                'answer_text' => is_array($value) ? json_encode($value) : (string)$value 
-            ]);
+            \App\Models\OnboardingAnswer::updateOrCreate(
+                ['user_id' => $user->id, 'question_key' => $key],
+                ['answer_text' => is_array($value) ? json_encode($value) : (string)$value]
+            );
         }
 
-        // 2. Mark onboarding as completed
-        $user = $request->user();
         $user->onboarding_completed = true;
         $user->save();
 
-        // 3. Trigger the Smart AI Matching
+        // 2. Try the AI matching but DON'T let it crash the request
         try {
-            $matchingService = new MatchingService();
-            $recommendations = $matchingService->getRecommendedConsultants($userId);
+            $matchingService = new \App\Services\MatchingService();
+            $recommendations = $matchingService->getRecommendedConsultants($user->id);
 
-            // Save the result to the DB
-            AiRecommendation::create([
-                'user_id' => $userId,
-                'rec_type' => 'consultant_match',
-                'content_json' => $recommendations
-            ]);
-
-            return response()->json([
-                'message' => 'Onboarding successful and AI matches found',
-                'recommendations' => $recommendations
-            ]);
-
-        } catch (\Exception $e) {
-            // Even if AI fails, onboarding is still "saved"
-            return response()->json([
-                'message' => 'Onboarding saved, but AI matching delayed.',
-                'error' => $e->getMessage()
-            ]);
+            if (!empty($recommendations)) {
+                \App\Models\AiRecommendation::create([
+                    'user_id' => $user->id,
+                    'rec_type' => 'consultant_match',
+                    'content_json' => $recommendations
+                ]);
+            }
+        } catch (\Exception $aiError) {
+            // Log the error so we can fix it later, but keep the request alive!
+            \Log::error("AI Matching failed: " . $aiError->getMessage());
         }
+
+        // 3. Always return success so CORS works
+        return response()->json(['message' => 'Onboarding successful', 'redirect' => '/dashboard']);
+
+    } catch (\Exception $e) {
+        \Log::error("Critical Onboarding Error: " . $e->getMessage());
+        return response()->json(['error' => 'Saving failed'], 500);
+    }
+
     }
 }

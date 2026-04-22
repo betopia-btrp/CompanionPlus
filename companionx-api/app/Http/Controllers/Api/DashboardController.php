@@ -42,4 +42,20 @@ class DashboardController extends Controller
 
         return response()->json($result);
     }
+
+    public function remix(Request $request) {
+    $user = $request->user();
+    $matchingService = new \App\Services\MatchingService();
+    $recommendations = $matchingService->getRecommendedConsultants($user->id);
+
+    if (!empty($recommendations)) {
+        \App\Models\AiRecommendation::updateOrCreate(
+            ['user_id' => $user->id, 'rec_type' => 'consultant_match'],
+            ['content_json' => $recommendations]
+        );
+        return response()->json(['message' => 'AI Matched successfully!', 'data' => $recommendations]);
+    }
+
+    return response()->json(['message' => 'AI still failing. Check logs.'], 500);
+}
 }

@@ -1,78 +1,72 @@
 "use client";
-import { useEffect, useState } from "react";
-import api from "@/lib/axios";
-import { User, MessageSquare, Star, ArrowRight } from "lucide-react";
+import Link from 'next/link';
+import { BookOpen, Calendar, MessageCircle, PlayCircle, Star, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import api from '@/lib/axios';
 
 export default function Dashboard() {
-  const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchRecs();
+    // Fetch user info to show name
+    api.get('/user').then(res => setUser(res.data));
   }, []);
 
-  const fetchRecs = async () => {
-    try {
-      const res = await api.get("/dashboard/recommendations");
-      setRecommendations(res.data);
-    } catch (e) {
-      console.error("Failed to fetch recs");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <div className="p-20 text-center">Analysing your profile...</div>;
+  const ACTIONS = [
+    { title: "Anonymous Booking", desc: "Match with professional consultants", icon: <Calendar className="w-8 h-8" />, href: "/dashboard/booking", color: "bg-blue-500" },
+    { title: "Mood Journal", desc: "Track your emotions with AI analysis", icon: <BookOpen className="w-8 h-8" />, href: "/dashboard/journal", color: "bg-emerald-500" },
+    { title: "Mental Lab", desc: "AI-generated personalized exercises", icon: <Star className="w-8 h-8" />, href: "/dashboard/exercises", color: "bg-purple-500" },
+    { title: "Counseling Room", desc: "Join your private anonymous session", icon: <PlayCircle className="w-8 h-8" />, href: "/dashboard/room", color: "bg-rose-500" },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-12">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-slate-50">
+      {/* Top Header */}
+      <nav className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center">
+        <div className="text-2xl font-black text-blue-600">CompanionX</div>
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-slate-600">Hello, {user?.first_name || 'Friend'}</span>
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+            {user?.first_name[0]}
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto p-8 md:p-12">
         <header className="mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Welcome back!</h1>
-          <p className="text-slate-500 text-lg">Here are your personalized matches based on your onboarding answers.</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">Mental Wellness Hub</h1>
+          <p className="text-slate-500 text-lg">Your safe space for healing and growth.</p>
         </header>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {recommendations.map((consultant: any) => (
-            <div key={consultant.id} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
-              <div className="flex items-start justify-between mb-6">
-                <div className="bg-blue-100 p-4 rounded-2xl">
-                  <User className="w-8 h-8 text-blue-600" />
+        {/* 4 CORE ENDPOINTS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {ACTIONS.map((action) => (
+            <Link key={action.title} href={action.href}>
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all group">
+                <div className={`${action.color} text-white p-4 rounded-2xl w-fit mb-6 shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform`}>
+                  {action.icon}
                 </div>
-                <div className="flex items-center gap-1 text-amber-500 font-bold">
-                  <Star className="w-4 h-4 fill-current" />
-                  {consultant.average_rating}
-                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{action.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{action.desc}</p>
               </div>
-
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
-                {consultant.user.first_name} {consultant.user.last_name}
-              </h3>
-              <p className="text-blue-600 font-semibold mb-4">{consultant.specialization}</p>
-              
-              <div className="bg-blue-50 p-4 rounded-2xl mb-6">
-                <div className="flex gap-2 mb-1">
-                    <MessageSquare className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Why we matched you</span>
-                </div>
-                <p className="text-slate-700 italic">"{consultant.match_reason}"</p>
-              </div>
-
-              <p className="text-slate-500 text-sm mb-8 line-clamp-2">{consultant.bio}</p>
-
-              <div className="flex items-center justify-between">
-                <div>
-                    <span className="text-2xl font-black text-slate-900">৳{consultant.base_rate_bdt}</span>
-                    <span className="text-slate-400 text-sm"> / session</span>
-                </div>
-                <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors">
-                  Book Session <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
-      </div>
+
+        {/* BOTTOM SECTION (AI RECOMMENDATION PREVIEW) */}
+        <div className="bg-blue-900 rounded-[2rem] p-10 text-white relative overflow-hidden shadow-2xl">
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="max-w-xl text-center md:text-left">
+              <h2 className="text-3xl font-bold mb-4 italic">"Healing is not linear."</h2>
+              <p className="text-blue-100 text-lg">Your AI-suggested consultants are ready to meet you. Start your journey today.</p>
+            </div>
+            <Link href="/dashboard/booking" className="bg-white text-blue-900 px-8 py-4 rounded-2xl font-black hover:bg-blue-50 transition-colors whitespace-nowrap">
+              View Recommended Consultants
+            </Link>
+          </div>
+          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl"></div>
+        </div>
+      </main>
     </div>
   );
 }

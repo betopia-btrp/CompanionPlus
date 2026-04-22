@@ -4,26 +4,32 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OnboardingController;
-use App\Http\Controllers\Api\DashboardController; // 1. MUST IMPORT THIS
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\JournalController; // Ensure this is imported
 
-// --- Public routes (No login required) ---
+// Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-
-// --- Protected routes (MUST be logged in) ---
+// Protected routes (Login required)
 Route::middleware('auth:sanctum')->group(function () {
     
-    // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
 
-    // Onboarding
-    Route::post('/onboarding', [OnboardingController::class, 'store']);
-    
-    // Dashboard (Needs to be here to use $request->user())
-    Route::get('/dashboard/recommendations', [DashboardController::class, 'getRecommendations']);
+    // --- PATIENT ONLY ROUTES ---
+    Route::middleware('patient')->group(function () {
+        
+        // Onboarding & Matching
+        Route::post('/onboarding', [OnboardingController::class, 'store']);
+        Route::get('/dashboard/recommendations', [DashboardController::class, 'getRecommendations']);
+        Route::get('/dashboard/remix', [DashboardController::class, 'remix']);
 
+        // Mood Journal CRUD (Task #2 for today)
+        Route::get('/journal', [JournalController::class, 'index']);
+        Route::post('/journal', [JournalController::class, 'store']);
+        Route::delete('/journal/{id}', [JournalController::class, 'destroy']);
+    });
 });

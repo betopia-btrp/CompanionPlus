@@ -49,7 +49,7 @@ export default function RegisterPage() {
     try {
       const response = await api.post("/register", formData);
       localStorage.setItem("token", response.data.token);
-      router.push("/onboarding");
+      router.push("/login");
     } catch (error: any) {
       console.error(
         "Registration failed:",
