@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiRecommendation;
+use App\Models\Booking;
 use App\Models\ConsultantProfile;
 use App\Services\ExerciseProgressService;
 use App\Services\ExerciseService;
@@ -162,6 +163,96 @@ class DashboardController extends Controller
                 'profile_summary' => $recommendationPayload['profile_summary'],
                 'matches' => $this->buildMatchedConsultantPayload(collect($recommendationPayload['matches'])),
             ],
+        ]);
+    }
+
+    public function getNextAppointment(Request $request)
+    {
+        $user = $request->user();
+
+        $booking = Booking::where('patient_id', $user->id)
+            ->where('scheduled_start', '>', now())
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->with('consultant.user:id,first_name,last_name')
+            ->orderBy('scheduled_start')
+            ->first();
+
+        if (!$booking) {
+            return response()->json([
+                'has_upcoming' => false,
+                'booking' => null,
+            ]);
+        }
+
+        return response()->json([
+            'has_upcoming' => true,
+            'booking' => [
+                'id' => $booking->id,
+                'status' => $booking->status,
+                'scheduled_start' => $booking->scheduled_start->toIso8601String(),
+                'scheduled_end' => $booking->scheduled_end->toIso8601String(),
+                'consultant' => [
+                    'name' => trim(
+                        ($booking->consultant->user->first_name ?? '') . ' ' .
+                        ($booking->consultant->user->last_name ?? '')
+                    ),
+                    'specialization' => $booking->consultant->specialization,
+                ],
+            ],
+        ]);
+    }
+
+    public function getDashboardSummary(
+        Request $request,
+        ExerciseService $exerciseService,
+        ExerciseProgressService $exerciseProgressService
+    ) {
+        $user = $request->user();
+
+        $nextBooking = Booking::where('patient_id', $user->id)
+            ->where('scheduled_start', '>', now())
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->with('consultant.user:id,first_name,last_name')
+            ->orderBy('scheduled_start')
+            ->first();
+
+        $exercise = AiRecommendation::where('user_id', $user->id)
+            ->where('rec_type', 'exercise')
+            ->latest()
+            ->first();
+
+        $moodTracker = $exerciseProgressService->buildMoodTracker($user->id);
+
+        $exerciseData = null;
+        if ($exercise) {
+            $exercisePayload = $exerciseService->normalizeStoredPayload($exercise->content_json);
+            $progress = $exerciseProgressService->buildProgressPayload(
+                $exercise->exerciseProgress,
+                $exercisePayload,
+                $exerciseService->badgeTrack()
+            );
+            $exerciseData = array_merge($exercisePayload, [
+                'recommendation_id' => $exercise->id,
+                'progress' => $progress,
+            ]);
+        }
+
+        return response()->json([
+            'next_appointment' => $nextBooking ? [
+                'id' => $nextBooking->id,
+                'status' => $nextBooking->status,
+                'scheduled_start' => $nextBooking->scheduled_start->toIso8601String(),
+                'scheduled_end' => $nextBooking->scheduled_end->toIso8601String(),
+                'consultant' => [
+                    'name' => trim(
+                        ($nextBooking->consultant->user->first_name ?? '') . ' ' .
+                        ($nextBooking->consultant->user->last_name ?? '')
+                    ),
+                    'specialization' => $nextBooking->consultant->specialization,
+                ],
+            ] : null,
+            'mood_tracker' => $moodTracker,
+            'exercise' => $exerciseData,
         ]);
     }
 

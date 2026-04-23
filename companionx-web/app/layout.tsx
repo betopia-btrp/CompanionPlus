@@ -32,7 +32,7 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-full flex flex-col">
-        <div className="w-full max-w-6xl mx-auto">{children}</div>
+        <div className="w-full">{children}</div>
       </body>
     </html>
   );

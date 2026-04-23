@@ -35,7 +35,22 @@ class AnalyzeJournalSentiment implements ShouldQueue
             return;
         }
 
+        Log::info('AnalyzeJournalSentiment: Starting analysis.', [
+            'journal_id' => $journal->id,
+            'user_id' => $journal->user_id,
+            'has_text' => filled($journal->text_note),
+            'emoji_mood' => $journal->emoji_mood,
+        ]);
+
         $analysis = $sentimentAnalysisService->analyze($journal);
+
+        Log::info('AnalyzeJournalSentiment: Analysis complete.', [
+            'journal_id' => $journal->id,
+            'sentiment_score' => $analysis['sentiment_score'],
+            'is_at_risk' => $analysis['is_at_risk'],
+            'severity' => $analysis['severity'],
+            'dominant_state' => $analysis['dominant_state'],
+        ]);
 
         $journal->update([
             'sentiment_score' => $analysis['sentiment_score'],
@@ -52,6 +67,13 @@ class AnalyzeJournalSentiment implements ShouldQueue
         ]);
 
         if (($analysis['is_at_risk'] ?? false) === true) {
+            Log::warning('AnalyzeJournalSentiment: SAFETY ALERT triggered.', [
+                'journal_id' => $journal->id,
+                'user_id' => $journal->user_id,
+                'severity' => $analysis['severity'],
+                'risk_summary' => $analysis['risk_summary'],
+            ]);
+
             SafetyAlert::updateOrCreate(
                 ['journal_id' => $journal->id],
                 [

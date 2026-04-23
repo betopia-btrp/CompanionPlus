@@ -1,743 +1,538 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/axios";
 import Link from "next/link";
 import {
-  AlertCircle,
   ArrowLeft,
-  BrainCircuit,
-  Calendar,
-  HeartPulse,
-  LineChart,
-  LoaderCircle,
+  CaretLeft,
+  CaretRight,
   Plus,
-  ShieldAlert,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+  Check,
+  TrendUp,
+} from "@phosphor-icons/react";
 
 type JournalEntry = {
   id: number;
   emoji_mood: string;
-  text_note?: string | null;
-  sentiment_score?: number | null;
-  sentiment_percent?: number | null;
-  sentiment_label: string;
-  is_at_risk: boolean;
+  text_note: string | null;
+  sentiment_score: number | null;
   created_at: string;
-  analysis_status: "pending" | "ready";
-  analysis: {
-    dominant_state?: string | null;
-    emotional_shift?: string | null;
-    intensity?: string | null;
-    recommended_focus?: string | null;
-    supportive_insight?: string | null;
-    severity?: string | null;
-    risk_summary?: string | null;
-  };
-  safety_alert?: {
-    status: string;
-    severity: string;
-    created_at: string;
-  } | null;
 };
 
 type JournalDashboard = {
   entries: JournalEntry[];
-  summary: {
-    entries_count: number;
-    analysis_ready_count: number;
-    average_sentiment_score?: number | null;
-    latest_state?: string | null;
-    latest_focus?: string | null;
-    latest_sentiment_label?: string | null;
-    streak_days: number;
-  };
   mood_tracker: {
-    entries_count: number;
-    average_score?: number | null;
-    trend: string;
     points: {
       id: number;
-      label?: string | null;
+      label: string;
       date: string;
       emoji_mood: string;
       sentiment_score: number;
     }[];
-  };
-  safety: {
-    open_alerts_count: number;
-    highest_open_severity?: string | null;
-    latest_risk_entry_id?: number | null;
-    latest_risk_summary?: string | null;
   };
 };
 
 type MoodOption = {
   value: string;
   emoji: string;
-  label: string;
 };
 
 const moodOptions: MoodOption[] = [
-  { value: "happy", emoji: "😊", label: "Good" },
-  { value: "neutral", emoji: "😐", label: "Steady" },
-  { value: "sad", emoji: "😔", label: "Low" },
-  { value: "anxious", emoji: "😰", label: "Anxious" },
-  { value: "angry", emoji: "😡", label: "Frustrated" },
+  { value: "happy", emoji: "😊" },
+  { value: "neutral", emoji: "😐" },
+  { value: "sad", emoji: "😔" },
+  { value: "anxious", emoji: "😰" },
+  { value: "angry", emoji: "😡" },
 ];
 
-const emptyDashboard: JournalDashboard = {
-  entries: [],
-  summary: {
-    entries_count: 0,
-    analysis_ready_count: 0,
-    average_sentiment_score: null,
-    latest_state: null,
-    latest_focus: null,
-    latest_sentiment_label: null,
-    streak_days: 0,
-  },
-  mood_tracker: {
-    entries_count: 0,
-    average_score: null,
-    trend: "steady",
-    points: [],
-  },
-  safety: {
-    open_alerts_count: 0,
-    highest_open_severity: null,
-    latest_risk_entry_id: null,
-    latest_risk_summary: null,
-  },
-};
+function getEmojiForMood(mood: string): string {
+  const map: Record<string, string> = {
+    happy: "😊",
+    neutral: "😐",
+    sad: "😔",
+    anxious: "😰",
+    angry: "😡",
+  };
+  return map[mood] || mood;
+}
+
+function getMoodColor(mood: string): string {
+  const map: Record<string, string> = {
+    happy: "text-emerald-500",
+    neutral: "text-sky-500",
+    sad: "text-violet-500",
+    anxious: "text-amber-500",
+    angry: "text-rose-500",
+  };
+  return map[mood] || "text-muted-foreground";
+}
+
+function getDayKey(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function formatDayLabel(date: Date): { day: string; num: number } {
+  const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  return { day: days[date.getDay()], num: date.getDate() };
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatWeekRange(dates: Date[]): string {
+  if (dates.length === 0) return "";
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  const first = dates[0].toLocaleDateString("en-US", opts);
+  const last = dates[dates.length - 1].toLocaleDateString("en-US", opts);
+  return `${first} – ${last}`;
+}
+
+function AutoGrowTextarea({
+  value,
+  onChange,
+  placeholder,
+  onKeyDown,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const resize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 128) + "px";
+  }, []);
+
+  useEffect(() => {
+    resize();
+  }, [value, resize]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className="w-full resize-none overflow-hidden border-b border-border bg-transparent px-1 py-1 font-sans text-[14px] leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
 
 export default function JournalPage() {
-  const [dashboard, setDashboard] = useState<JournalDashboard>(emptyDashboard);
+  const [dashboard, setDashboard] = useState<JournalDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  
-  // FORM STATE
+
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const days = useMemo(() => {
+    const result: { date: Date; key: string }[] = [];
+    const today = new Date();
+    const startOffset = weekOffset * 7;
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i - startOffset);
+      result.push({ date: d, key: getDayKey(d) });
+    }
+    return result;
+  }, [weekOffset]);
+
+  const todayKey = getDayKey(new Date());
+  const [selectedDay, setSelectedDay] = useState(todayKey);
+
+  const [showNewEntry, setShowNewEntry] = useState(false);
+  const [newMood, setNewMood] = useState<MoodOption>(moodOptions[0]);
   const [newNote, setNewNote] = useState("");
-  const [selectedMood, setSelectedMood] = useState<MoodOption>(moodOptions[0]);
   const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     try {
       const res = await api.get("/api/journal");
       setDashboard(res.data);
-    } catch (error) {
-      console.error("Error fetching journal", error);
+    } catch (err) {
+      console.error("Failed to fetch journal", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    let ignore = false;
-
-    api
-      .get("/api/journal")
-      .then((res) => {
-        if (!ignore) {
-          setDashboard(res.data);
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching journal", error);
-      })
-      .finally(() => {
-        if (!ignore) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
+    fetchDashboard();
   }, []);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setStatusMessage(null);
+  const entriesByDay = useMemo(() => {
+    if (!dashboard) return [];
+    return dashboard.entries
+      .filter((e) => getDayKey(new Date(e.created_at)) === selectedDay)
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+  }, [dashboard, selectedDay]);
 
+  const handleSave = async () => {
+    if (!newNote.trim()) return;
+    setSaving(true);
     try {
       await api.post("/api/journal", {
-        emoji_mood: selectedMood.value,
+        emoji_mood: newMood.value,
         text_note: newNote,
       });
-
       setNewNote("");
-      setSelectedMood(moodOptions[0]);
-      setShowModal(false);
-      setStatusMessage(
-        "Journal saved. Sentiment analysis and safety review are running in the background.",
-      );
+      setNewMood(moodOptions[0]);
+      setShowNewEntry(false);
       await fetchDashboard();
-    } catch (error) {
-      console.error("Failed to save journal", error);
-      setStatusMessage("Failed to save journal.");
+    } catch (err) {
+      console.error("Failed to save", err);
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteEntry = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this journal entry?")) {
-      return;
-    }
+  const chartPath = useMemo(() => {
+    if (!dashboard) return "";
+    const points = dashboard.mood_tracker.points.slice(-14);
+    if (points.length < 2) return "";
+    const w = 200;
+    const h = 120;
+    const pad = 10;
+    const graphHeight = h - pad * 2;
+    return points
+      .map((p, i) => {
+        const x = pad + (i / (points.length - 1)) * (w - pad * 2);
+        const y = h - pad - p.sentiment_score * graphHeight;
+        return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [dashboard]);
 
-    try {
-      await api.delete(`/api/journal/${id}`);
-      setStatusMessage("Journal entry deleted.");
-      await fetchDashboard();
-    } catch (error) {
-      console.error("Failed to delete journal", error);
-      setStatusMessage("Could not delete this journal entry.");
-    }
-  };
-
-  const chartPath = useMemo(
-    () => buildChartPath(dashboard.mood_tracker.points),
-    [dashboard.mood_tracker.points],
-  );
+  const areaPath = useMemo(() => {
+    if (!chartPath) return "";
+    const w = 200;
+    const h = 120;
+    const pad = 10;
+    return `${chartPath} L ${w - pad} ${h - pad} L ${pad} ${h - pad} Z`;
+  }, [chartPath]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(20,184,166,0.12),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(239,68,68,0.10),_transparent_26%),linear-gradient(180deg,#f8fafc_0%,#f6fffb_100%)] p-6 md:p-12">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-10 flex items-center justify-between gap-4">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-slate-500 transition hover:text-teal-700"
-          >
-            <ArrowLeft size={20} /> Back to Hub
-          </Link>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 rounded-2xl bg-teal-600 px-6 py-3 font-bold text-white shadow-lg shadow-teal-100 transition hover:bg-teal-700"
-          >
-            <Plus size={20} /> Write Today
-          </button>
-        </div>
-
-        <section className="mb-8 overflow-hidden rounded-[2.3rem] border border-slate-200 bg-slate-950 px-8 py-9 text-white shadow-2xl shadow-teal-100">
-          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+      <div className="mx-auto max-w-6xl px-8 py-10">
+        <header className="mb-8">
+          <div className="flex items-center gap-4 mb-2">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-100">
-                <Sparkles size={14} />
-                Mood Intelligence
-              </div>
-              <h1 className="text-4xl font-black tracking-tight md:text-5xl">
-                Mood History with AI insight, trend tracking, and safety review.
-              </h1>
-              <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-300">
-                Every entry saves instantly. Analysis runs in the queue, then
-                turns your journal into a living emotional dashboard.
+              <p className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                Mood Journal
               </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SummaryStat
-                label="Journal Streak"
-                value={`${dashboard.summary.streak_days} day${dashboard.summary.streak_days === 1 ? "" : "s"}`}
-                icon={<Calendar size={16} />}
-              />
-              <SummaryStat
-                label="Trend"
-                value={dashboard.mood_tracker.trend}
-                icon={<LineChart size={16} />}
-              />
-              <SummaryStat
-                label="Latest Focus"
-                value={dashboard.summary.latest_focus || "Waiting"}
-                icon={<BrainCircuit size={16} />}
-              />
-              <SummaryStat
-                label="Open Alerts"
-                value={`${dashboard.safety.open_alerts_count}`}
-                icon={<ShieldAlert size={16} />}
-                danger={dashboard.safety.open_alerts_count > 0}
-              />
+              <h1 className="font-heading text-xl font-semibold text-foreground">
+                Journal Archive
+              </h1>
             </div>
           </div>
-        </section>
+        </header>
 
-        {statusMessage ? (
-          <div className="mb-6 rounded-2xl border border-teal-200 bg-white/85 px-5 py-4 text-sm font-semibold text-teal-800 shadow-sm">
-            {statusMessage}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <p className="font-sans text-sm text-muted-foreground">
+              Loading...
+            </p>
           </div>
-        ) : null}
-
-        {dashboard.safety.open_alerts_count > 0 ? (
-          <div className="mb-6 rounded-[2rem] border border-red-200 bg-red-50 px-6 py-5 text-red-800 shadow-sm">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-0.5 shrink-0" size={20} />
-              <div>
-                <p className="font-black uppercase tracking-[0.18em]">
-                  Safety attention active
+        ) : (
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_240px]">
+            {/* ── Right: Sentiment Trend ─────────────────────── */}
+            <div className="order-1 border border-border bg-card p-5 lg:order-none">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                  Sentiment Trend
                 </p>
-                <p className="mt-2 text-sm leading-7">
-                  {dashboard.safety.latest_risk_summary ||
-                    "At least one journal entry is currently flagged for urgent review."}
-                </p>
+                <TrendUp size={16} weight="bold" className="text-primary" />
               </div>
-            </div>
-          </div>
-        ) : null}
-
-        <section className="mb-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[2.2rem] border border-slate-200 bg-white p-7 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-700">
-                  Mood Tracker
-                </p>
-                <h2 className="mt-2 text-3xl font-black text-slate-900">
-                  Emotional rhythm over time
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                  This graph combines mood entries and analyzed sentiment so you
-                  can see whether things are steady, improving, or dipping.
-                </p>
-              </div>
-              <div className="rounded-[1.7rem] bg-slate-950 px-5 py-4 text-white">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-200">
-                  Average score
-                </p>
-                <p className="mt-2 text-2xl font-black">
-                  {dashboard.summary.average_sentiment_score ?? "--"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-[2rem] bg-[linear-gradient(180deg,#f8fafc_0%,#ecfeff_100%)] p-5">
-              {dashboard.mood_tracker.points.length ? (
-                <>
-                  <svg
-                    viewBox="0 0 100 42"
-                    className="h-56 w-full overflow-visible"
-                    preserveAspectRatio="none"
+              {/* Day selector with week nav */}
+              <div className="mb-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <button
+                    onClick={() => setWeekOffset((w) => w + 1)}
+                    className="flex h-7 w-7 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                   >
-                    <defs>
-                      <linearGradient id="journal-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#14b8a6" />
-                        <stop offset="100%" stopColor="#0f172a" />
-                      </linearGradient>
-                    </defs>
-                    {[10, 20, 30].map((line) => (
-                      <line
-                        key={line}
-                        x1="0"
-                        x2="100"
-                        y1={line}
-                        y2={line}
-                        stroke="#cbd5e1"
-                        strokeDasharray="2 3"
-                        strokeWidth="0.3"
+                    <CaretLeft size={14} weight="bold" />
+                  </button>
+                  <span className="font-sans text-[11px] font-medium text-muted-foreground">
+                    {formatWeekRange(days.map((d) => d.date))}
+                  </span>
+                  <button
+                    onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
+                    disabled={weekOffset === 0}
+                    className="flex h-7 w-7 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <CaretRight size={14} weight="bold" />
+                  </button>
+                </div>
+
+                <div className="flex gap-0 overflow-x-auto border-b border-border">
+                  {days.map(({ date, key }) => {
+                    const { day, num } = formatDayLabel(date);
+                    const isActive = key === selectedDay;
+                    const isToday = key === todayKey && weekOffset === 0;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedDay(key)}
+                        className={`flex min-w-[64px] flex-1 flex-col items-center border-b-2 px-3 py-3 font-sans text-[11px] transition-colors ${
+                          isActive
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span className="font-medium tracking-wider uppercase">
+                          {day}
+                        </span>
+                        <span
+                          className={`mt-0.5 text-base font-semibold ${
+                            isToday && !isActive ? "text-foreground" : ""
+                          }`}
+                        >
+                          {num}
+                        </span>
+                        {isToday && (
+                          <span className="mt-0.5 h-1 w-1 rounded-full bg-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Entries timeline — pl-8=32px, line at 11px, dots at -left-27px from child(32px) = 5px, center=11px ✓ */}
+              <div className="relative pl-8">
+                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+
+                {entriesByDay.length === 0 && !showNewEntry ? (
+                  <div className="py-8">
+                    <p className="font-sans text-sm text-muted-foreground">
+                      No entries for this day.
+                    </p>
+                  </div>
+                ) : (
+                  entriesByDay.map((entry) => {
+                    const entryEmoji = getEmojiForMood(entry.emoji_mood);
+                    const moodColor = getMoodColor(entry.emoji_mood);
+                    return (
+                      <div key={entry.id} className="relative mb-6 pb-6">
+                        <div
+                          className={`absolute -left-[27px] top-[3px] h-3 w-3 rounded-full border-2 bg-background ${moodColor.replace("text-", "border-")}`}
+                        />
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {formatTime(entry.created_at)}
+                        </span>
+                        <div className="mt-2 flex items-start gap-2.5">
+                          <span className={`text-xl leading-none ${moodColor}`}>
+                            {entryEmoji}
+                          </span>
+                          <p className="font-sans text-[14px] leading-relaxed text-foreground whitespace-pre-wrap">
+                            {entry.text_note || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {showNewEntry ? (
+                  <div className="relative mb-6 pb-6">
+                    <div className="absolute -left-[27px] top-[3px] h-3 w-3 rounded-full border-2 border-primary bg-primary" />
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {new Date().toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </span>
+                    <div className="mt-2">
+                      <div className="mb-2 flex gap-1">
+                        {moodOptions.map((m) => (
+                          <button
+                            key={m.value}
+                            onClick={() => setNewMood(m)}
+                            className={`flex h-7 w-7 items-center justify-center border text-sm transition-all ${
+                              newMood.value === m.value
+                                ? "border-primary bg-primary/10"
+                                : "border-border bg-background hover:border-primary/30"
+                            }`}
+                          >
+                            {m.emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <AutoGrowTextarea
+                            value={newNote}
+                            onChange={setNewNote}
+                            placeholder="How are you feeling?"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSave();
+                              }
+                            }}
+                          />
+                        </div>
+                        <button
+                          onClick={handleSave}
+                          disabled={saving || !newNote.trim()}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center border border-primary bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+                        >
+                          <Check size={16} weight="bold" />
+                        </button>
+                      </div>
+                      <p className="mt-1 font-sans text-[10px] text-muted-foreground">
+                        Shift+Enter for new line
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative mb-6 pb-6">
+                    <div className="absolute -left-[27px] top-[3px] h-3 w-3 rounded-full border-2 border-dashed border-muted-foreground/30 bg-background" />
+                    <button
+                      onClick={() => setShowNewEntry(true)}
+                      className="mt-0.5 flex items-center gap-2 font-sans text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Plus size={16} weight="bold" />
+                      Add entry
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Left: Days + Entries ───────────────────────── */}
+            <div className="order-2 lg:order-none">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                  Sentiment Trend
+                </p>
+                <TrendUp size={16} weight="bold" className="text-primary" />
+              </div>
+
+              {dashboard && dashboard.mood_tracker.points.length > 0 ? (
+                <div>
+                  <svg
+                    viewBox="0 0 200 120"
+                    className="w-full"
+                    style={{ height: 120 }}
+                  >
+                    {[
+                      { val: 1, label: "100%" },
+                      { val: 0.5, label: "50%" },
+                      { val: 0, label: "0%" },
+                    ].map(({ val, label }) => {
+                      const y = 10 + val * 100;
+                      return (
+                        <g key={val}>
+                          <line
+                            x1="10"
+                            x2="190"
+                            y1={y}
+                            y2={y}
+                            stroke="currentColor"
+                            className="text-border"
+                            strokeWidth="0.5"
+                          />
+                          <text
+                            x="6"
+                            y={y}
+                            textAnchor="end"
+                            dominantBaseline="middle"
+                            fontSize="7"
+                            className="fill-muted-foreground"
+                          >
+                            {label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {areaPath && (
+                      <path
+                        d={areaPath}
+                        fill="currentColor"
+                        className="text-primary/5"
                       />
-                    ))}
-                    {chartPath ? (
+                    )}
+                    {chartPath && (
                       <path
                         d={chartPath}
                         fill="none"
-                        stroke="url(#journal-line)"
-                        strokeWidth="1.8"
+                        stroke="currentColor"
+                        className="text-primary"
+                        strokeWidth="2"
                         strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
-                    ) : null}
-                    {dashboard.mood_tracker.points.map((point, index) => {
-                      const x =
-                        dashboard.mood_tracker.points.length === 1
-                          ? 50
-                          : (index / (dashboard.mood_tracker.points.length - 1)) * 100;
-                      const y = 38 - point.sentiment_score * 30;
-
+                    )}
+                    {dashboard.mood_tracker.points.slice(-14).map((p, i) => {
+                      const pts = dashboard.mood_tracker.points.slice(-14);
+                      const x = 10 + (i / Math.max(pts.length - 1, 1)) * 180;
+                      const y = 110 - p.sentiment_score * 100;
+                      const emoji = getEmojiForMood(p.emoji_mood);
                       return (
-                        <circle
-                          key={point.id}
-                          cx={x}
-                          cy={y}
-                          r="1.8"
-                          fill="#0f172a"
-                          stroke="#ffffff"
-                          strokeWidth="0.8"
-                        />
+                        <g key={p.id}>
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r="14"
+                            fill="currentColor"
+                            className="text-background"
+                          />
+                          <text
+                            x={x}
+                            y={y}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize="16"
+                          >
+                            {emoji}
+                          </text>
+                        </g>
                       );
                     })}
                   </svg>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <MetricCard
-                      label="Entries"
-                      value={`${dashboard.summary.entries_count}`}
-                    />
-                    <MetricCard
-                      label="Analysis Ready"
-                      value={`${dashboard.summary.analysis_ready_count}`}
-                    />
-                    <MetricCard
-                      label="Latest State"
-                      value={dashboard.summary.latest_state || "Waiting"}
-                    />
+                  <div className="mt-3 flex justify-between font-sans text-[9px] text-muted-foreground">
+                    {dashboard.mood_tracker.points.slice(-14).map((p, i) => (
+                      <span
+                        key={p.id}
+                        className={
+                          i ===
+                          dashboard.mood_tracker.points.slice(-14).length - 1
+                            ? "text-primary font-medium"
+                            : ""
+                        }
+                      >
+                        {p.label}
+                      </span>
+                    ))}
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="rounded-[1.8rem] bg-white px-6 py-12 text-center">
-                  <p className="text-xl font-black text-slate-900">
-                    Your mood graph will appear here
-                  </p>
-                  <p className="mt-3 text-sm leading-7 text-slate-500">
-                    Add a few journal entries and the AI analysis will start
-                    shaping a trend line.
+                <div className="py-8 text-center">
+                  <p className="font-sans text-[12px] text-muted-foreground">
+                    No data yet
                   </p>
                 </div>
               )}
             </div>
           </div>
-
-          <div className="grid gap-6">
-            <InsightPanel
-              title="Latest Emotional Read"
-              body={
-                dashboard.summary.latest_state
-                  ? `Your latest analyzed mood reads as ${dashboard.summary.latest_state}, with a current focus on ${dashboard.summary.latest_focus || "reflection"}.`
-                  : "The AI needs a processed journal entry before it can describe your latest emotional pattern."
-              }
-              icon={<HeartPulse size={18} />}
-            />
-            <InsightPanel
-              title="Sentiment Snapshot"
-              body={
-                dashboard.summary.latest_sentiment_label
-                  ? `Your most recent analyzed entry is currently labeled ${dashboard.summary.latest_sentiment_label}. Keep journaling to give the model a stronger trend signal.`
-                  : "No analyzed sentiment snapshot yet."
-              }
-              icon={<BrainCircuit size={18} />}
-            />
-            <InsightPanel
-              title="Safety Layer"
-              body={
-                dashboard.safety.open_alerts_count > 0
-                  ? `${dashboard.safety.open_alerts_count} open safety alert${dashboard.safety.open_alerts_count === 1 ? "" : "s"} currently exist for review.`
-                  : "No open safety alerts right now. The safety layer is still watching every new entry in the background."
-              }
-              icon={<AlertCircle size={18} />}
-              danger={dashboard.safety.open_alerts_count > 0}
-            />
-          </div>
-        </section>
-
-        {loading ? (
-          <div className="py-20 text-center text-slate-400">Loading your journey...</div>
-        ) : dashboard.entries.length === 0 ? (
-          <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white p-20 text-center">
-            <p className="text-lg text-slate-400">
-              Your journal is empty. Start writing to unlock sentiment tracking
-              and AI pattern insights.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {dashboard.entries.map((entry) => {
-              const moodDisplay = resolveMoodOption(entry.emoji_mood);
-              const sentimentColor = getSentimentColor(entry.sentiment_score);
-
-              return (
-                <div
-                  key={entry.id}
-                  className={`group rounded-[2rem] border bg-white p-6 shadow-sm transition hover:shadow-md ${
-                    entry.is_at_risk ? "border-red-200" : "border-slate-100"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex items-start gap-5">
-                      <span className="text-5xl">{moodDisplay.emoji}</span>
-                      <div className="max-w-3xl">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                            {moodDisplay.label}
-                          </span>
-
-                          {entry.analysis_status === "pending" ? (
-                            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-                              AI analysis pending
-                            </span>
-                          ) : (
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-bold ${sentimentColor}`}
-                            >
-                              Sentiment {entry.sentiment_percent ?? "--"}% ·{" "}
-                              {entry.sentiment_label}
-                            </span>
-                          )}
-
-                          {entry.analysis.intensity ? (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                              {entry.analysis.intensity} intensity
-                            </span>
-                          ) : null}
-
-                          {entry.is_at_risk ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
-                              <ShieldAlert size={14} />
-                              Safety alert created
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <p className="text-lg font-medium leading-8 text-slate-700">
-                          {entry.text_note || "No notes added"}
-                        </p>
-
-                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-400">
-                          <Calendar size={14} />
-                          {new Date(entry.created_at).toLocaleDateString("en-US", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-
-                        {entry.analysis_status === "ready" ? (
-                          <div className="mt-5 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
-                            <div className="rounded-[1.6rem] bg-slate-50 p-4">
-                              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                                AI Read
-                              </p>
-                              <p className="mt-3 text-sm leading-7 text-slate-700">
-                                Dominant state:{" "}
-                                <span className="font-bold">
-                                  {entry.analysis.dominant_state || "Unknown"}
-                                </span>
-                                <br />
-                                Emotional shift:{" "}
-                                <span className="font-bold">
-                                  {entry.analysis.emotional_shift || "steady"}
-                                </span>
-                                <br />
-                                Recommended focus:{" "}
-                                <span className="font-bold">
-                                  {entry.analysis.recommended_focus || "grounding"}
-                                </span>
-                              </p>
-                            </div>
-
-                            <div className="rounded-[1.6rem] bg-teal-50/60 p-4">
-                              <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
-                                Supportive Insight
-                              </p>
-                              <p className="mt-3 text-sm leading-7 text-slate-700">
-                                {entry.analysis.supportive_insight ||
-                                  "No supportive insight available yet."}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-5 rounded-[1.6rem] border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
-                            The analysis worker has not finished yet. Refresh in
-                            a moment to see the emotional read and safety summary.
-                          </div>
-                        )}
-
-                        {entry.is_at_risk ? (
-                          <div className="mt-5 rounded-[1.6rem] border border-red-100 bg-red-50 p-4 text-sm leading-7 text-red-700">
-                            <span className="font-bold">Risk summary:</span>{" "}
-                            {entry.analysis.risk_summary ||
-                              "This entry was flagged for urgent review."}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => deleteEntry(entry.id)}
-                      className="p-3 text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-red-500"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
-
-        {showModal ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6 backdrop-blur-sm">
-            <div className="w-full max-w-xl rounded-[2.5rem] bg-white p-10 shadow-2xl">
-              <h2 className="mb-3 text-2xl font-bold text-slate-900">
-                How are you feeling today?
-              </h2>
-              <p className="mb-8 text-sm leading-7 text-slate-500">
-                Save the moment quickly. The deeper sentiment read and safety
-                review will happen right after in the background.
-              </p>
-
-              <div className="mb-8 grid grid-cols-5 gap-3">
-                {moodOptions.map((mood) => (
-                  <button
-                    key={mood.value}
-                    onClick={() => setSelectedMood(mood)}
-                    className={`rounded-2xl p-3 text-center transition-all ${
-                      selectedMood.value === mood.value
-                        ? "scale-105 bg-teal-50 shadow-sm"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <div className="text-4xl">{mood.emoji}</div>
-                    <div className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      {mood.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <textarea
-                className="mb-6 h-40 w-full resize-none rounded-2xl border border-slate-100 bg-slate-50 p-5 outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="What's on your mind? (Optional)"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 rounded-2xl py-4 font-bold text-slate-500 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-teal-600 py-4 font-bold text-white shadow-lg shadow-teal-100 transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {saving ? (
-                    <LoaderCircle size={18} className="animate-spin" />
-                  ) : null}
-                  Save Journal
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
-}
-
-function SummaryStat({
-  label,
-  value,
-  icon,
-  danger = false,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-[1.7rem] border px-5 py-4 ${
-        danger ? "border-red-300 bg-red-500/10" : "border-white/10 bg-white/5"
-      }`}
-    >
-      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-200">
-        {icon}
-        {label}
-      </div>
-      <p className="mt-3 text-2xl font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white px-4 py-4">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function InsightPanel({
-  title,
-  body,
-  icon,
-  danger = false,
-}: {
-  title: string;
-  body: string;
-  icon: ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-[2rem] border p-6 shadow-sm ${
-        danger
-          ? "border-red-200 bg-red-50"
-          : "border-slate-200 bg-white"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${
-            danger ? "bg-red-500 text-white" : "bg-slate-950 text-white"
-          }`}
-        >
-          {icon}
-        </span>
-        <h3 className="text-xl font-black text-slate-900">{title}</h3>
-      </div>
-      <p className="mt-4 text-sm leading-7 text-slate-600">{body}</p>
-    </div>
-  );
-}
-
-function resolveMoodOption(value: string): MoodOption {
-  return (
-    moodOptions.find((option) => option.value === value) ??
-    moodOptions.find((option) => option.emoji === value) ??
-    moodOptions[0]
-  );
-}
-
-function getSentimentColor(score?: number | null): string {
-  if (score === null || score === undefined) {
-    return "bg-amber-50 text-amber-700";
-  }
-
-  if (score >= 0.75) {
-    return "bg-emerald-50 text-emerald-700";
-  }
-
-  if (score >= 0.5) {
-    return "bg-blue-50 text-blue-700";
-  }
-
-  if (score >= 0.25) {
-    return "bg-orange-50 text-orange-700";
-  }
-
-  return "bg-red-50 text-red-700";
-}
-
-function buildChartPath(
-  points: JournalDashboard["mood_tracker"]["points"],
-): string {
-  if (points.length < 2) {
-    return "";
-  }
-
-  return points
-    .map((point, index) => {
-      const x = (index / (points.length - 1)) * 100;
-      const y = 38 - point.sentiment_score * 30;
-
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
 }

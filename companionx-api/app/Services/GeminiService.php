@@ -20,16 +20,28 @@ class GeminiService
 
     public function __construct()
     {
-        $this->apiKey = (string) config('services.gemini.api_key', '');
-        $this->model = (string) config('services.gemini.model', 'gemini-1.5-flash');
-        $this->apiVersion = (string) config('services.gemini.api_version', 'v1');
-        $this->baseUrl = rtrim((string) config('services.gemini.base_url', 'https://generativelanguage.googleapis.com'), '/');
+        $this->apiKey = (string) config("services.gemini.api_key", "");
+        $this->model = (string) config(
+            "services.gemini.model",
+            "gemini-flash-lite-latest",
+        );
+        $this->apiVersion = (string) config(
+            "services.gemini.api_version",
+            "v1beta",
+        );
+        $this->baseUrl = rtrim(
+            (string) config(
+                "services.gemini.base_url",
+                "https://generativelanguage.googleapis.com",
+            ),
+            "/",
+        );
     }
 
     public function generateJson(string $prompt, array $options = []): ?array
     {
         if (blank($this->apiKey)) {
-            Log::warning('GeminiService: GEMINI_API_KEY is not configured.');
+            Log::warning("GeminiService: GEMINI_API_KEY is not configured.");
 
             return null;
         }
@@ -38,14 +50,16 @@ class GeminiService
             'contents' => [[
                 'role' => 'user',
                 'parts' => [[
-                    'text' => $prompt,
+                    'text' => $this->prependSystemInstruction($prompt, $options),
                 ]],
             ]],
             'safetySettings' => $options['safety_settings'] ?? $this->mentalHealthSafetySettings(),
             'generationConfig' => array_filter([
                 'temperature' => $options['temperature'] ?? 0.2,
                 'maxOutputTokens' => $options['max_output_tokens'] ?? 2048,
-                'response_mime_type' => 'application/json',
+                'thinkingConfig' => [
+                    'thinkingLevel' => $options['thinking_level'] ?? 'MINIMAL',
+                ],
             ], static fn ($value) => $value !== null),
         ];
 
@@ -53,37 +67,36 @@ class GeminiService
             $payload['generationConfig']['response_schema'] = $options['response_schema'];
         }
 
-        if (!empty($options['system_instruction'])) {
-            $payload['systemInstruction'] = [
-                'parts' => [[
-                    'text' => $options['system_instruction'],
-                ]],
-            ];
-        }
-
         try {
-            $response = Http::timeout($options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS)
+            $response = Http::timeout(
+                $options["timeout"] ?? self::DEFAULT_TIMEOUT_SECONDS,
+            )
                 ->retry(2, 500, throw: false)
                 ->withHeaders([
-                    'x-goog-api-key' => $this->apiKey,
-                    'Content-Type' => 'application/json',
+                    "Content-Type" => "application/json",
                 ])
-                ->post($this->endpoint(), $payload);
+                ->post($this->endpoint() . '?key=' . $this->apiKey, $payload);
 
             if ($response->failed()) {
-                Log::error('GeminiService: API request failed.', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
+                Log::error("GeminiService: API request failed.", [
+                    "status" => $response->status(),
+                    "body" => $response->body(),
                 ]);
 
                 return null;
             }
 
-            $content = data_get($response->json(), 'candidates.0.content.parts.0.text');
+            $content = data_get(
+                $response->json(),
+                "candidates.0.content.parts.0.text",
+            );
 
-            if (!is_string($content) || trim($content) === '') {
-                Log::warning('GeminiService: Empty response content.', [
-                    'prompt_feedback' => data_get($response->json(), 'promptFeedback'),
+            if (!is_string($content) || trim($content) === "") {
+                Log::warning("GeminiService: Empty response content.", [
+                    "prompt_feedback" => data_get(
+                        $response->json(),
+                        "promptFeedback",
+                    ),
                 ]);
 
                 return null;
@@ -93,9 +106,9 @@ class GeminiService
             $decoded = json_decode($cleanedContent, true);
 
             if (!is_array($decoded)) {
-                Log::warning('GeminiService: Failed to decode JSON response.', [
-                    'raw_content' => $cleanedContent,
-                    'json_error' => json_last_error_msg(),
+                Log::warning("GeminiService: Failed to decode JSON response.", [
+                    "raw_content" => $cleanedContent,
+                    "json_error" => json_last_error_msg(),
                 ]);
 
                 return null;
@@ -103,12 +116,12 @@ class GeminiService
 
             return $decoded;
         } catch (RequestException $exception) {
-            Log::error('GeminiService: Request exception.', [
-                'message' => $exception->getMessage(),
+            Log::error("GeminiService: Request exception.", [
+                "message" => $exception->getMessage(),
             ]);
         } catch (\Throwable $exception) {
-            Log::error('GeminiService: Unexpected exception.', [
-                'message' => $exception->getMessage(),
+            Log::error("GeminiService: Unexpected exception.", [
+                "message" => $exception->getMessage(),
             ]);
         }
 
@@ -120,9 +133,20 @@ class GeminiService
         return sprintf('%s/%s/models/%s:generateContent', $this->baseUrl, $this->apiVersion, $this->model);
     }
 
+    private function prependSystemInstruction(string $prompt, array $options): string
+    {
+        $systemInstruction = $options['system_instruction'] ?? '';
+
+        if (blank($systemInstruction)) {
+            return $prompt;
+        }
+
+        return "[System Instruction]\n{$systemInstruction}\n\n[User Content]\n{$prompt}";
+    }
+
     private function cleanJsonContent(string $content): string
     {
-        $cleaned = preg_replace('/^```json|```$/m', '', trim($content));
+        $cleaned = preg_replace('/^```json|```$/m', "", trim($content));
 
         return is_string($cleaned) ? trim($cleaned) : trim($content);
     }
@@ -131,24 +155,24 @@ class GeminiService
     {
         return [
             [
-                'category' => 'HARM_CATEGORY_HARASSMENT',
-                'threshold' => 'BLOCK_NONE',
+                "category" => "HARM_CATEGORY_HARASSMENT",
+                "threshold" => "BLOCK_NONE",
             ],
             [
-                'category' => 'HARM_CATEGORY_HATE_SPEECH',
-                'threshold' => 'BLOCK_NONE',
+                "category" => "HARM_CATEGORY_HATE_SPEECH",
+                "threshold" => "BLOCK_NONE",
             ],
             [
-                'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                'threshold' => 'BLOCK_NONE',
+                "category" => "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold" => "BLOCK_NONE",
             ],
             [
-                'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                'threshold' => 'BLOCK_NONE',
+                "category" => "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold" => "BLOCK_NONE",
             ],
             [
-                'category' => 'HARM_CATEGORY_CIVIC_INTEGRITY',
-                'threshold' => 'BLOCK_NONE',
+                "category" => "HARM_CATEGORY_CIVIC_INTEGRITY",
+                "threshold" => "BLOCK_NONE",
             ],
         ];
     }

@@ -2,20 +2,38 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import {
   ArrowLeft,
-  Award,
+  ArrowRight,
   Brain,
-  CheckCircle2,
-  Clock3,
-  LineChart,
-  LoaderCircle,
-  MessageCircleHeart,
-  Sparkles,
-  Target,
-  TrendingUp,
-} from "lucide-react";
+  CheckCircle,
+  Clock,
+  Lightning,
+  TrendUp,
+  Trophy,
+} from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import {
+  Progress,
+  ProgressLabel,
+  ProgressValue,
+} from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { AreaChart, Area, CartesianGrid, XAxis, YAxis } from "recharts";
 
 type ExerciseTask = {
   task_key: string;
@@ -126,7 +144,7 @@ export default function ExercisesPage() {
   const [savingReview, setSavingReview] = useState(false);
   const [reviewFeeling, setReviewFeeling] = useState("");
   const [reviewText, setReviewText] = useState("");
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     api
@@ -138,7 +156,6 @@ export default function ExercisesPage() {
       })
       .catch((error) => {
         const fallbackData = error.response?.data ?? null;
-
         setData(fallbackData);
         setReviewFeeling(fallbackData?.progress?.review?.feeling ?? "");
         setReviewText(fallbackData?.progress?.review?.text ?? "");
@@ -161,12 +178,9 @@ export default function ExercisesPage() {
   }, [data?.progress?.chapter_statuses]);
 
   const handleToggleTask = async (taskKey: string) => {
-    if (!data?.recommendation_id || !data.progress) {
-      return;
-    }
+    if (!data?.recommendation_id || !data.progress) return;
 
     const nextTaskKeys = new Set(data.progress.completed_task_keys);
-
     if (nextTaskKeys.has(taskKey)) {
       nextTaskKeys.delete(taskKey);
     } else {
@@ -174,35 +188,25 @@ export default function ExercisesPage() {
     }
 
     setSavingTasks(true);
-    setStatusMessage(null);
 
     try {
       const res = await api.patch("/api/dashboard/exercises/progress", {
         recommendation_id: data.recommendation_id,
         completed_task_keys: Array.from(nextTaskKeys),
       });
-
       setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              progress: res.data.progress,
-            }
-          : prev,
+        prev ? { ...prev, progress: res.data.progress } : prev,
       );
-      setStatusMessage("Progress saved.");
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
         error !== null &&
         "response" in error &&
-        typeof (error as { response?: { data?: { message?: string } } }).response
-          ?.data?.message === "string"
-          ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message ?? "Could not update exercise progress."
+        typeof (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message === "string"
+          ? ((error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message ?? "Could not update exercise progress.")
           : "Could not update exercise progress.";
-
-      setStatusMessage(message);
     } finally {
       setSavingTasks(false);
     }
@@ -210,13 +214,9 @@ export default function ExercisesPage() {
 
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!data?.recommendation_id) {
-      return;
-    }
+    if (!data?.recommendation_id) return;
 
     setSavingReview(true);
-    setStatusMessage(null);
 
     try {
       const res = await api.patch("/api/dashboard/exercises/progress", {
@@ -224,30 +224,21 @@ export default function ExercisesPage() {
         review_feeling: reviewFeeling || null,
         review_text: reviewText || null,
       });
-
       setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              progress: res.data.progress,
-            }
-          : prev,
+        prev ? { ...prev, progress: res.data.progress } : prev,
       );
       setReviewFeeling(res.data.progress.review?.feeling ?? "");
       setReviewText(res.data.progress.review?.text ?? "");
-      setStatusMessage("Reflection saved.");
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
         error !== null &&
         "response" in error &&
-        typeof (error as { response?: { data?: { message?: string } } }).response
-          ?.data?.message === "string"
-          ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message ?? "Could not save your reflection."
+        typeof (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message === "string"
+          ? ((error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message ?? "Could not save your reflection.")
           : "Could not save your reflection.";
-
-      setStatusMessage(message);
     } finally {
       setSavingReview(false);
     }
@@ -257,205 +248,174 @@ export default function ExercisesPage() {
   const progress = data?.progress;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(20,184,166,0.14),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.12),_transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eefbf8_100%)] px-6 py-8 md:px-10 md:py-12">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-10 flex items-center justify-between gap-4">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-teal-700"
-          >
-            <ArrowLeft size={18} /> Back to Hub
-          </Link>
-          <div className="rounded-full border border-teal-200 bg-white/85 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-teal-700 shadow-sm">
-            Mental Lab
-          </div>
-        </div>
-
-        <section className="mb-8 overflow-hidden rounded-[2.6rem] border border-slate-200 bg-slate-950 px-8 py-10 text-white shadow-2xl shadow-teal-100 md:px-12">
-          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+      <div className="mx-auto max-w-6xl px-8 py-10">
+        {/* ── Page Header ────────────────────────────────────────── */}
+        <header className="mb-8">
+          <div className="flex items-center gap-4 mb-2">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-100">
-                <Sparkles size={14} />
-                Gamified Recovery
-              </div>
-              <h1 className="max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
-                {data?.journey?.headline ||
-                  "Your adaptive exercise quest, built from how you are doing."}
-              </h1>
-              <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-300 md:text-lg">
-                {data?.journey?.motivation ||
-                  "Each chapter gives you practical steps, trackable wins, and reflection space so support feels personal and alive."}
+              <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                Adaptive Exercises
               </p>
-
-              <div className="mt-6 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-200">
-                {data?.phase ? (
-                  <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-200">
-                    {data.phase}
-                  </span>
-                ) : null}
-                {data?.trend_analysis?.direction ? (
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-blue-100">
-                    {data.trend_analysis.direction}
-                  </span>
-                ) : null}
-                {typeof data?.journey?.total_energy_points === "number" ? (
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-amber-100">
-                    {data.journey.total_energy_points} energy points
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-teal-100">
-                  <TrendingUp size={16} />
-                  Trend Signal
-                </div>
-                <p className="text-sm leading-relaxed text-slate-200">
-                  {data?.trend_analysis?.summary ||
-                    "Save mood journal entries to generate deeper adaptive guidance."}
-                </p>
-              </div>
-
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-100">
-                  <Award size={16} />
-                  Current Badge
-                </div>
-                {progress?.badge ? (
-                  <>
-                    <p className="text-lg font-black text-white">
-                      {progress.badge.name}
-                    </p>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                      {progress.badge.description}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm leading-relaxed text-slate-300">
-                    Complete your first chapter to unlock your first badge.
-                  </p>
-                )}
-              </div>
+              <h1 className="font-heading text-xl font-semibold text-foreground">
+                Mental Lab
+              </h1>
             </div>
           </div>
-        </section>
+        </header>
 
-        {statusMessage ? (
-          <div className="mb-6 rounded-2xl border border-teal-200 bg-white/85 px-5 py-4 text-sm font-semibold text-teal-800 shadow-sm">
-            {statusMessage}
+        {/* ── Journey Summary ────────────────────────────────────── */}
+        {data?.journey ? (
+          <div className="mb-8 border border-border bg-card p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Brain size={16} weight="bold" className="text-primary" />
+              <span className="font-sans text-xs font-medium tracking-[0.12em] text-primary uppercase border border-primary/40 px-2 py-0.5">
+                {data.phase || "Recovery"}
+              </span>
+              {data.trend_analysis?.direction ? (
+                <span className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase border border-border px-2 py-0.5">
+                  {data.trend_analysis.direction}
+                </span>
+              ) : null}
+              {typeof data.journey.total_energy_points === "number" ? (
+                <span className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase border border-border px-2 py-0.5">
+                  {data.journey.total_energy_points} XP
+                </span>
+              ) : null}
+            </div>
+            <p className="font-heading text-lg font-medium text-foreground">
+              {data.journey.headline ||
+                "Your adaptive exercise quest, built from how you are doing."}
+            </p>
+            <p className="mt-2 font-sans text-sm leading-relaxed text-muted-foreground">
+              {data.journey.motivation ||
+                "Each chapter gives you practical steps, trackable wins, and reflection space."}
+            </p>
           </div>
         ) : null}
 
+        {/* ── Loading State ──────────────────────────────────────── */}
         {loading ? (
-          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="h-[24rem] animate-pulse rounded-[2rem] border border-slate-200 bg-white/80" />
-            <div className="h-[24rem] animate-pulse rounded-[2rem] border border-slate-200 bg-white/80" />
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="h-60 animate-pulse border border-border bg-muted" />
+            <div className="h-60 animate-pulse border border-border bg-muted" />
           </div>
-        ) : data?.status === "pending" || data?.status === "missing_onboarding" ? (
-          <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <MoodTrackerCard moodPoints={moodPoints} tracker={data?.mood_tracker} />
-            <div className="rounded-[2.4rem] border border-dashed border-slate-300 bg-white/80 px-8 py-12 shadow-sm">
-              <h2 className="text-2xl font-black text-slate-900">
+        ) : data?.status === "pending" ||
+          data?.status === "missing_onboarding" ? (
+          /* ── Pending / Missing Onboarding ───────────────────────── */
+          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <MoodTrackerCard
+              moodPoints={moodPoints}
+              tracker={data?.mood_tracker}
+            />
+            <div className="border border-dashed border-border bg-card p-10 text-center">
+              <p className="mb-1 font-heading text-sm font-medium text-foreground">
                 {data.status === "pending"
                   ? "Your exercise plan is being prepared"
                   : "Your first exercise plan unlocks after onboarding"}
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-slate-500">
+              </p>
+              <p className="mx-auto max-w-sm font-sans text-xs text-muted-foreground">
                 {data.message ||
                   "Complete the next step and this space will transform into your chapter-based exercise journey."}
               </p>
-              <Link
-                href={
-                  data.status === "missing_onboarding"
-                    ? "/onboarding"
-                    : "/dashboard/journal"
+              <Button
+                size="sm"
+                className="mt-5 text-xs font-medium"
+                onClick={() =>
+                  router.push(
+                    data.status === "missing_onboarding"
+                      ? "/onboarding"
+                      : "/dashboard/journal",
+                  )
                 }
-                className="mt-8 inline-flex rounded-2xl bg-teal-600 px-6 py-4 text-sm font-black text-white transition hover:bg-teal-700"
               >
                 {data.status === "missing_onboarding"
                   ? "Start Onboarding"
                   : "Write in Mood Journal"}
-              </Link>
+                <ArrowRight size={14} weight="bold" />
+              </Button>
             </div>
           </section>
         ) : data?.chapters?.length ? (
+          /* ── Active Chapters ────────────────────────────────────── */
           <div className="space-y-8">
-            <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <MoodTrackerCard moodPoints={moodPoints} tracker={data?.mood_tracker} />
+            {/* ── Progress + Badges Row ─────────────────────────────── */}
+            <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+              <MoodTrackerCard
+                moodPoints={moodPoints}
+                tracker={data?.mood_tracker}
+              />
 
-              <div className="grid gap-6">
-                <div className="rounded-[2.2rem] border border-slate-200 bg-white p-7 shadow-sm">
+              <div className="grid gap-4">
+                {/* Progress */}
+                <div className="border border-border bg-card p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-700">
+                      <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         Progress
                       </p>
-                      <h2 className="mt-2 text-2xl font-black text-slate-900">
+                      <p className="mt-1 font-heading text-lg font-semibold text-foreground">
                         {progress?.completion_percentage ?? 0}% complete
-                      </h2>
+                      </p>
                     </div>
                     {(savingTasks || savingReview) && (
-                      <LoaderCircle className="animate-spin text-teal-500" size={20} />
+                      <div className="h-4 w-4 animate-spin border-2 border-primary border-t-transparent" />
                     )}
                   </div>
-
-                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#14b8a6_0%,#f59e0b_100%)] transition-all"
-                      style={{
-                        width: `${progress?.completion_percentage ?? 0}%`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                    <span>
-                      {progress?.completed_tasks ?? 0} / {progress?.total_tasks ?? 0} tasks
-                      done
-                    </span>
-                    <span>{data.journey?.total_energy_points ?? 0} energy points</span>
+                  <Progress
+                    value={progress?.completion_percentage ?? 0}
+                    className="mt-4"
+                  >
+                    <ProgressLabel className="font-sans text-xs font-medium text-muted-foreground">
+                      {progress?.completed_tasks ?? 0} /{" "}
+                      {progress?.total_tasks ?? 0} tasks
+                    </ProgressLabel>
+                    <ProgressValue className="font-sans text-xs font-medium text-muted-foreground" />
+                  </Progress>
+                  <div className="mt-3 flex items-center justify-between font-sans text-xs text-muted-foreground">
+                    <span>{data.journey?.total_energy_points ?? 0} XP</span>
                   </div>
                 </div>
 
-                <div className="rounded-[2.2rem] border border-amber-200 bg-[linear-gradient(145deg,#fff7ed_0%,#fffbeb_100%)] p-7 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg">
-                      <Award size={20} />
-                    </span>
+                {/* Badge Track */}
+                <div className="border border-border bg-card p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Trophy size={16} weight="bold" className="text-primary" />
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">
+                      <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         Badge Track
                       </p>
-                      <h2 className="text-2xl font-black text-slate-900">
+                      <p className="mt-0.5 font-heading text-sm font-medium text-foreground">
                         {progress?.badge?.name || "First badge waiting"}
-                      </h2>
+                      </p>
                     </div>
                   </div>
-
-                  <p className="mt-4 text-sm leading-7 text-slate-600">
+                  <p className="font-sans text-xs leading-relaxed text-muted-foreground">
                     {progress?.badge?.description ||
-                      "Complete a full chapter to unlock your first reward and build momentum."}
+                      "Complete a full chapter to unlock your first reward."}
                   </p>
-
-                  <div className="mt-5 grid gap-3">
+                  <div className="mt-4 space-y-2">
                     {data.journey?.badge_track?.map((badge) => {
                       const unlocked =
                         (progress?.completed_chapter_keys?.length ?? 0) >=
                         badge.unlock_after_chapters;
-
                       return (
                         <div
                           key={badge.code}
-                          className={`rounded-2xl border px-4 py-3 text-sm ${
+                          className={`border px-4 py-3 ${
                             unlocked
-                              ? "border-amber-300 bg-white text-slate-700"
-                              : "border-white/70 bg-white/60 text-slate-400"
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-border bg-muted/30"
                           }`}
                         >
-                          <p className="font-black">{badge.name}</p>
-                          <p className="mt-1 leading-6">{badge.description}</p>
+                          <p
+                            className={`font-sans text-xs font-medium ${unlocked ? "text-foreground" : "text-muted-foreground"}`}
+                          >
+                            {badge.name}
+                          </p>
+                          <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+                            {badge.description}
+                          </p>
                         </div>
                       );
                     })}
@@ -464,92 +424,98 @@ export default function ExercisesPage() {
               </div>
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="grid gap-6">
+            {/* ── Chapters + Sidebar ────────────────────────────────── */}
+            <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-4">
                 {data.chapters.map((chapter, index) => {
-                  const chapterStatus = chapterStatuses.get(chapter.chapter_key);
+                  const chapterStatus = chapterStatuses.get(
+                    chapter.chapter_key,
+                  );
 
                   return (
                     <article
                       key={chapter.chapter_key}
-                      className="overflow-hidden rounded-[2.2rem] border border-slate-200 bg-white p-8 shadow-sm"
+                      className="border border-border bg-card"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="max-w-2xl">
-                          <div className="mb-4 flex items-center gap-3">
-                            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
-                              <Brain size={20} />
-                            </span>
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+                      {/* Chapter Header */}
+                      <div className="p-6 pb-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="max-w-2xl">
+                            <div className="mb-3 flex items-center gap-2">
+                              <Brain
+                                size={14}
+                                weight="bold"
+                                className="text-primary"
+                              />
+                              <span className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                                 Chapter {index + 1}
-                              </p>
-                              <h2 className="text-2xl font-black tracking-tight text-slate-900">
-                                {chapter.chapter_title}
-                              </h2>
+                              </span>
                             </div>
+                            <h2 className="font-heading text-sm font-semibold text-foreground">
+                              {chapter.chapter_title}
+                            </h2>
+                            <p className="mt-1 font-sans text-xs font-medium text-primary">
+                              {chapter.chapter_goal}
+                            </p>
+                            <p className="mt-3 font-sans text-xs leading-relaxed text-muted-foreground">
+                              {chapter.content}
+                            </p>
                           </div>
-
-                          <p className="text-sm font-semibold text-teal-700">
-                            {chapter.chapter_goal}
-                          </p>
-                          <p className="mt-4 text-sm leading-7 text-slate-600">
-                            {chapter.content}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3">
-                          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700">
-                            <Clock3 size={14} />
-                            {chapter.estimated_time}
-                          </span>
-                          <span className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-2 text-xs font-bold text-teal-700">
-                            <Sparkles size={14} />
-                            {chapter.energy_points} XP
-                          </span>
-                          {chapterStatus?.is_complete ? (
-                            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700">
-                              <CheckCircle2 size={14} />
-                              Chapter complete
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1 border border-border px-2.5 py-1 font-sans text-xs text-muted-foreground">
+                              <Clock size={10} weight="bold" />
+                              {chapter.estimated_time}
                             </span>
-                          ) : null}
+                            <span className="inline-flex items-center gap-1 border border-border px-2.5 py-1 font-sans text-xs text-muted-foreground">
+                              <Lightning size={10} weight="bold" />
+                              {chapter.energy_points} XP
+                            </span>
+                            {chapterStatus?.is_complete ? (
+                              <span className="inline-flex items-center gap-1 border border-primary/40 bg-primary/5 px-2.5 py-1 font-sans text-xs text-primary">
+                                <CheckCircle size={10} weight="bold" />
+                                Complete
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="mt-8 grid gap-4">
+                      {/* Tasks */}
+                      <div className="px-6 pb-4 space-y-2">
                         {chapter.tasks.map((task) => {
                           const checked = completedTaskKeys.has(task.task_key);
-
                           return (
                             <button
                               key={task.task_key}
                               type="button"
                               onClick={() => handleToggleTask(task.task_key)}
                               disabled={savingTasks}
-                              className={`rounded-[1.7rem] border p-5 text-left transition ${
+                              className={`w-full border p-4 text-left transition ${
                                 checked
-                                  ? "border-emerald-200 bg-emerald-50/80"
-                                  : "border-slate-200 bg-slate-50/70 hover:border-teal-200 hover:bg-teal-50/40"
+                                  ? "border-primary/40 bg-primary/5"
+                                  : "border-border bg-muted/30 hover:border-primary/30"
                               }`}
                             >
-                              <div className="flex items-start gap-4">
+                              <div className="flex items-start gap-3">
                                 <span
-                                  className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border ${
                                     checked
-                                      ? "border-emerald-500 bg-emerald-500 text-white"
-                                      : "border-slate-300 bg-white text-transparent"
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-background"
                                   }`}
                                 >
-                                  <CheckCircle2 size={14} />
+                                  {checked && (
+                                    <CheckCircle size={10} weight="bold" />
+                                  )}
                                 </span>
                                 <div>
-                                  <p className="text-base font-black text-slate-900">
+                                  <p className="font-sans text-sm font-medium text-foreground">
                                     {task.title}
                                   </p>
-                                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                                  <p className="mt-1 font-sans text-xs leading-relaxed text-muted-foreground">
                                     {task.instruction}
                                   </p>
-                                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  <p className="mt-2 font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                                     {task.completion_hint}
                                   </p>
                                 </div>
@@ -559,48 +525,54 @@ export default function ExercisesPage() {
                         })}
                       </div>
 
-                      <div className="mt-6 rounded-[1.8rem] bg-slate-950 px-5 py-4 text-sm leading-7 text-slate-200">
-                        <span className="font-black text-white">Reflection prompt:</span>{" "}
-                        {chapter.reflection_prompt}
+                      {/* Reflection Prompt */}
+                      <div className="border-t border-border bg-muted/30 px-6 py-4">
+                        <p className="font-sans text-xs leading-relaxed text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            Reflection:
+                          </span>{" "}
+                          {chapter.reflection_prompt}
+                        </p>
                       </div>
                     </article>
                   );
                 })}
               </div>
 
-              <aside className="space-y-6">
-                <div className="rounded-[2.2rem] border border-slate-200 bg-white p-7 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-lg">
-                      <Target size={20} />
-                    </span>
+              {/* ── Sidebar ──────────────────────────────────────────── */}
+              <aside className="space-y-4">
+                {/* Chapter Wins */}
+                <div className="border border-border bg-card p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Brain size={16} weight="bold" className="text-primary" />
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-700">
+                      <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         Chapter Wins
                       </p>
-                      <h2 className="text-2xl font-black text-slate-900">
+                      <p className="mt-0.5 font-heading text-sm font-medium text-foreground">
                         {progress?.completed_chapter_keys?.length ?? 0} /{" "}
-                        {data.chapters.length} chapters finished
-                      </h2>
+                        {data.chapters.length} chapters
+                      </p>
                     </div>
                   </div>
-
-                  <div className="mt-5 space-y-3">
+                  <div className="space-y-2">
                     {data.chapters.map((chapter) => {
-                      const chapterStatus = chapterStatuses.get(chapter.chapter_key);
-
+                      const chapterStatus = chapterStatuses.get(
+                        chapter.chapter_key,
+                      );
                       return (
                         <div
                           key={chapter.chapter_key}
-                          className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                          className="border border-border bg-muted/30 px-4 py-3"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <p className="font-black text-slate-800">
+                            <p className="font-sans text-xs font-medium text-foreground">
                               {chapter.chapter_title}
                             </p>
-                            <span className="text-sm font-semibold text-slate-500">
+                            <span className="font-sans text-xs text-muted-foreground">
                               {chapterStatus?.completed_tasks ?? 0}/
-                              {chapterStatus?.total_tasks ?? chapter.tasks.length}
+                              {chapterStatus?.total_tasks ??
+                                chapter.tasks.length}
                             </span>
                           </div>
                         </div>
@@ -609,88 +581,92 @@ export default function ExercisesPage() {
                   </div>
                 </div>
 
+                {/* Reflection Form */}
                 <form
                   onSubmit={handleReviewSubmit}
-                  className="rounded-[2.2rem] border border-slate-200 bg-white p-7 shadow-sm"
+                  className="border border-border bg-card p-6"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-lg">
-                      <MessageCircleHeart size={20} />
-                    </span>
+                  <div className="flex items-center gap-3 mb-4">
+                    <TrendUp size={16} weight="bold" className="text-primary" />
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-700">
+                      <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         After-Exercise Review
                       </p>
-                      <h2 className="text-2xl font-black text-slate-900">
+                      <p className="mt-0.5 font-heading text-sm font-medium text-foreground">
                         Capture how this felt
-                      </h2>
+                      </p>
                     </div>
                   </div>
 
-                  <p className="mt-4 text-sm leading-7 text-slate-600">
+                  <p className="mb-4 font-sans text-xs leading-relaxed text-muted-foreground">
                     Your reflection helps the next AI plan adapt its tone, task
                     depth, and pacing.
                   </p>
 
-                  <label className="mt-6 block text-sm font-bold text-slate-700">
+                  <label className="block font-sans text-foreground">
                     How do you feel after this exercise?
                   </label>
-                  <select
+                  <Select
                     value={reviewFeeling}
-                    onChange={(event) => setReviewFeeling(event.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-teal-400 focus:bg-white"
+                    onValueChange={(v) => setReviewFeeling(v ?? "")}
                   >
-                    <option value="">Select a feeling</option>
-                    {feelingOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="mt-1.5 w-full">
+                      <SelectValue placeholder="Select a feeling" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {feelingOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                  <label className="mt-5 block text-sm font-bold text-slate-700">
+                  <label className="mt-4 block text-foreground">
                     What stood out after finishing these chapters?
                   </label>
                   <textarea
                     value={reviewText}
                     onChange={(event) => setReviewText(event.target.value)}
-                    rows={6}
+                    rows={4}
                     placeholder="Example: The breathing helped quickly, but the action step felt most realistic today."
-                    className="mt-2 w-full rounded-[1.6rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-teal-400 focus:bg-white"
+                    className="mt-1.5 w-full border border-border bg-card px-3 py-2 font-sans text-xs leading-relaxed text-foreground outline-none focus:border-primary transition-colors resize-none"
                   />
 
-                  <button
+                  <Button
                     type="submit"
+                    size="sm"
                     disabled={savingReview}
-                    className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="mt-4 text-xs font-medium"
                   >
                     {savingReview ? (
-                      <LoaderCircle size={16} className="animate-spin" />
-                    ) : (
-                      <MessageCircleHeart size={16} />
-                    )}
+                      <span className="h-3 w-3 animate-spin border-2 border-primary-foreground border-t-transparent" />
+                    ) : null}
                     Save Reflection
-                  </button>
+                  </Button>
                 </form>
               </aside>
             </section>
           </div>
         ) : (
-          <section className="rounded-[2.5rem] border border-dashed border-slate-300 bg-white/80 px-8 py-14 text-center shadow-sm">
-            <h2 className="text-2xl font-black text-slate-900">
+          /* ── Empty State ─────────────────────────────────────────── */
+          <section className="border border-dashed border-border bg-card p-10 text-center">
+            <p className="mb-1 font-heading text-sm font-medium text-foreground">
               Your first exercise plan is almost there
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+            </p>
+            <p className="mx-auto max-w-sm font-sans text-xs text-muted-foreground">
               Journal saves return instantly, and the analysis runs on the queue
               in the background. Once a journal entry is processed, this page
               will fill with your chapter guide, task tracking, and mood graph.
             </p>
-            <Link
-              href="/dashboard/journal"
-              className="mt-8 inline-flex rounded-2xl bg-teal-600 px-6 py-4 text-sm font-black text-white transition hover:bg-teal-700"
+            <Button
+              size="sm"
+              className="mt-5 text-xs font-medium"
+              onClick={() => router.push("/dashboard/journal")}
             >
               Write in Mood Journal
-            </Link>
+              <ArrowRight size={14} weight="bold" />
+            </Button>
           </section>
         )}
       </div>
@@ -705,130 +681,139 @@ function MoodTrackerCard({
   moodPoints: MoodPoint[];
   tracker?: ExerciseRecommendation["mood_tracker"];
 }) {
-  const path = buildChartPath(moodPoints);
+  const chartData = moodPoints.map((point) => ({
+    label: point.label,
+    score: point.sentiment_score,
+    mood: point.emoji_mood,
+  }));
+
+  const chartConfig = {
+    score: {
+      label: "Sentiment",
+      color: "var(--primary)",
+    },
+  } satisfies ChartConfig;
 
   return (
-    <div className="rounded-[2.3rem] border border-slate-200 bg-white p-7 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="border border-border bg-card p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-700">
+          <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
             Mood Tracker
           </p>
-          <h2 className="mt-2 text-3xl font-black text-slate-900">
+          <h2 className="mt-1 font-heading text-base font-semibold text-foreground">
             30-day emotional rhythm
           </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+          <p className="mt-2 font-sans text-xs leading-relaxed text-muted-foreground">
             This graph blends your journal mood signal and sentiment analysis so
             you can see patterns over time.
           </p>
         </div>
-
-        <div className="rounded-[1.8rem] bg-slate-950 px-5 py-4 text-white">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-teal-200">
-            <LineChart size={14} />
+        <div className="border border-border bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-1.5 font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
+            <TrendUp size={12} weight="bold" />
             Trend
           </div>
-          <p className="mt-2 text-2xl font-black">
+          <p className="mt-1 font-heading text-sm font-medium text-foreground">
             {tracker?.trend || "steady"}
           </p>
-          <p className="mt-1 text-sm text-slate-300">
-            Avg score {tracker?.average_score ?? "--"}
+          <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+            Avg {tracker?.average_score ?? "--"}
           </p>
         </div>
       </div>
 
-      <div className="mt-8 rounded-[2rem] bg-[linear-gradient(180deg,#f8fafc_0%,#ecfeff_100%)] p-5">
-        {moodPoints.length ? (
+      <div className="border border-border bg-muted/30 p-4">
+        {chartData.length ? (
           <>
-            <div className="relative">
-              <svg
-                viewBox="0 0 100 42"
-                className="h-56 w-full overflow-visible"
-                preserveAspectRatio="none"
-              >
+            <ChartContainer
+              config={chartConfig}
+              className="min-h-[200px] w-full"
+            >
+              <AreaChart data={chartData}>
                 <defs>
-                  <linearGradient id="mood-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#14b8a6" />
-                    <stop offset="100%" stopColor="#f97316" />
+                  <linearGradient
+                    id="scoreGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0.15}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                 </defs>
-                {[10, 20, 30].map((line) => (
-                  <line
-                    key={line}
-                    x1="0"
-                    x2="100"
-                    y1={line}
-                    y2={line}
-                    stroke="#cbd5e1"
-                    strokeDasharray="2 3"
-                    strokeWidth="0.3"
-                  />
-                ))}
-                {path ? (
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke="url(#mood-line)"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                ) : null}
-                {moodPoints.map((point, index) => {
-                  const x =
-                    moodPoints.length === 1
-                      ? 50
-                      : (index / (moodPoints.length - 1)) * 100;
-                  const y = 38 - point.sentiment_score * 30;
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  className="text-xs"
+                />
+                <YAxis
+                  domain={[0, 1]}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  className="text-xs"
+                  width={30}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="score"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill="url(#scoreGradient)"
+                />
+              </AreaChart>
+            </ChartContainer>
 
-                  return (
-                    <circle
-                      key={point.id}
-                      cx={x}
-                      cy={y}
-                      r="1.8"
-                      fill="#0f172a"
-                      stroke="#ffffff"
-                      strokeWidth="0.8"
-                    />
-                  );
-                })}
-              </svg>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-white px-4 py-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="border border-border bg-card px-3 py-3">
+                <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                   Entries
                 </p>
-                <p className="mt-2 text-2xl font-black text-slate-900">
+                <p className="mt-1 font-heading text-sm font-medium text-foreground">
                   {tracker?.entries_count ?? moodPoints.length}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white px-4 py-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Latest mood
+              <div className="border border-border bg-card px-3 py-3">
+                <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
+                  Latest
                 </p>
-                <p className="mt-2 text-2xl font-black text-slate-900">
+                <p className="mt-1 font-heading text-sm font-medium text-foreground">
                   {moodPoints[moodPoints.length - 1]?.emoji_mood || "--"}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white px-4 py-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Highest point
+              <div className="border border-border bg-card px-3 py-3">
+                <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
+                  Peak
                 </p>
-                <p className="mt-2 text-2xl font-black text-slate-900">
-                  {Math.max(...moodPoints.map((point) => point.sentiment_score)).toFixed(2)}
+                <p className="mt-1 font-heading text-sm font-medium text-foreground">
+                  {Math.max(
+                    ...moodPoints.map((p) => p.sentiment_score),
+                  ).toFixed(2)}
                 </p>
               </div>
             </div>
           </>
         ) : (
-          <div className="rounded-[1.8rem] bg-white px-6 py-10 text-center">
-            <p className="text-lg font-black text-slate-900">
+          <div className="py-8 text-center">
+            <p className="font-heading text-sm font-medium text-foreground">
               Your mood graph will appear here
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              Add a few journal entries and this tracker will start drawing your
+            <p className="mt-2 font-sans text-xs text-muted-foreground">
+              Add journal entries and this tracker will start drawing your
               emotional rhythm automatically.
             </p>
           </div>
@@ -836,19 +821,4 @@ function MoodTrackerCard({
       </div>
     </div>
   );
-}
-
-function buildChartPath(points: MoodPoint[]) {
-  if (points.length < 2) {
-    return "";
-  }
-
-  return points
-    .map((point, index) => {
-      const x = (index / (points.length - 1)) * 100;
-      const y = 38 - point.sentiment_score * 30;
-
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
 }

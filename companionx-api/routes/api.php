@@ -23,6 +23,8 @@ Route::middleware("auth:sanctum")->group(function () {
 
     Route::middleware("patient")->group(function () {
         Route::post("/onboarding", [OnboardingController::class, "store"]);
+        Route::get("/dashboard/summary", [DashboardController::class, "getDashboardSummary"]);
+        Route::get("/dashboard/next-appointment", [DashboardController::class, "getNextAppointment"]);
         Route::get("/consultants", [ConsultantController::class, "index"]);
         Route::get("/consultants/{consultantId}/slots", [
             BookingFlowController::class,

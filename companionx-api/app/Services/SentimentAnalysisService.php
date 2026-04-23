@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MoodJournal;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SentimentAnalysisService
@@ -16,6 +17,48 @@ class SentimentAnalysisService
         'hurt myself',
         'no reason to live',
         'better off dead',
+        // Passive ideation patterns
+        'what if i wasn\'t around',
+        'what if i just wasn\'t around',
+        'would be better off without me',
+        'world would be fine without me',
+        'world would just close over',
+        'don\'t want to be here',
+        'not sure i want to wake up',
+        'just want it to stop',
+        'just want the pain to stop',
+        'no reason to keep going',
+        'no point in going on',
+        'tired of living',
+        'can\'t go on anymore',
+        'everyone would be better off',
+        'nobody would miss me',
+        'wish i could disappear',
+        'wish i wasn\'t here',
+    ];
+
+    private const TEXT_SENTIMENT_KEYWORDS = [
+        'very_negative' => [
+            'dread', 'heaviness', 'overwhelmed', 'can\'t stop crying',
+            'falling apart', 'breaking down', 'empty', 'hopeless',
+            'worthless', 'numb', 'hollow', 'desperate', 'suffocating',
+            'drowning', 'trapped', 'can\'t breathe', 'shaking',
+        ],
+        'negative' => [
+            'scared', 'anxious', 'worried', 'exhausted', 'drained',
+            'heavy', 'struggling', 'difficult', 'hard', 'pain',
+            'hurt', 'sad', 'down', 'low', 'bad', 'terrible',
+            'awful', 'miserable', 'lonely', 'isolated', 'afraid',
+        ],
+        'neutral' => [
+            'okay', 'fine', 'normal', 'alright', 'managing',
+            'getting by', 'could be worse', 'not great not bad',
+        ],
+        'positive' => [
+            'grateful', 'hopeful', 'better', 'good', 'happy',
+            'calm', 'peaceful', 'relief', 'progress', 'proud',
+            'connected', 'supported', 'lighter', 'clearer',
+        ],
     ];
 
     public function __construct(private readonly GeminiService $geminiService)
@@ -25,8 +68,18 @@ class SentimentAnalysisService
     public function analyze(MoodJournal $journal): array
     {
         if (blank($journal->text_note)) {
+            Log::info('SentimentAnalysis: No text, using emoji fallback.', [
+                'journal_id' => $journal->id,
+                'emoji_mood' => $journal->emoji_mood,
+            ]);
+
             return $this->fallbackAnalysis($journal);
         }
+
+        Log::info('SentimentAnalysis: Calling Gemini API.', [
+            'journal_id' => $journal->id,
+            'text_length' => strlen($journal->text_note),
+        ]);
 
         $response = $this->geminiService->generateJson(
             $this->buildPrompt($journal),
@@ -38,8 +91,18 @@ class SentimentAnalysisService
         );
 
         if (is_array($response)) {
+            Log::info('SentimentAnalysis: Gemini responded successfully.', [
+                'journal_id' => $journal->id,
+                'raw_score' => data_get($response, 'sentiment_score'),
+                'raw_is_at_risk' => data_get($response, 'is_at_risk'),
+            ]);
+
             return $this->normalizeAnalysis($response, $journal);
         }
+
+        Log::warning('SentimentAnalysis: Gemini failed, using text-keyword fallback.', [
+            'journal_id' => $journal->id,
+        ]);
 
         return $this->fallbackAnalysis($journal);
     }
@@ -87,6 +150,42 @@ class SentimentAnalysisService
             'angry' => 0.26,
             default => 0.50,
         };
+    }
+
+    private function scoreFromTextKeywords(string $text): float
+    {
+        $text = Str::lower($text);
+        $scores = [];
+
+        foreach (self::TEXT_SENTIMENT_KEYWORDS['very_negative'] as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $scores[] = 0.12;
+            }
+        }
+
+        foreach (self::TEXT_SENTIMENT_KEYWORDS['negative'] as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $scores[] = 0.30;
+            }
+        }
+
+        foreach (self::TEXT_SENTIMENT_KEYWORDS['neutral'] as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $scores[] = 0.55;
+            }
+        }
+
+        foreach (self::TEXT_SENTIMENT_KEYWORDS['positive'] as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $scores[] = 0.75;
+            }
+        }
+
+        if (empty($scores)) {
+            return 0.45;
+        }
+
+        return max(0.0, min(1.0, (float) array_sum($scores) / count($scores)));
     }
 
     public function sentimentLabelFromScore(?float $score): string
@@ -189,7 +288,9 @@ PROMPT;
             fn (string $phrase) => str_contains($text, $phrase)
         );
         $moodSignal = (string) $journal->emoji_mood;
-        $score = $this->scoreForMoodSignal($moodSignal);
+
+        // Use text-based scoring when text exists, emoji only as last resort
+        $score = filled($text) ? $this->scoreFromTextKeywords($text) : $this->scoreForMoodSignal($moodSignal);
 
         return [
             'sentiment_score' => $score,
