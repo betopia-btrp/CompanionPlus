@@ -4,20 +4,15 @@ const api = axios.create({
   baseURL:
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.BACKEND_URL ??
-    "http://127.0.0.1:8000/api",
+    "http://localhost:8000",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-});
-
-api.interceptors.request.use((config) => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
+  withXSRFToken: true,
+  xsrfCookieName: "XSRF-TOKEN",
+  xsrfHeaderName: "X-XSRF-TOKEN",
 });
 
 export default api;

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import api from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { login } from "@/lib/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,15 +17,9 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post("/login", { email, password });
+      const { user } = await login({ email, password });
 
-      localStorage.setItem("token", res.data.token);
-
-      if (res.data.user.onboarding_completed) {
-        router.push("/dashboard");
-      } else {
-        router.push("/onboarding");
-      }
+      router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
       alert("Invalid email or password");

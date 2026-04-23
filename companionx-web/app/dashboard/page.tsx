@@ -1,14 +1,9 @@
 "use client";
 import Link from "next/link";
-import {
-  BookOpen,
-  Calendar,
-  MessageCircle,
-  PlayCircle,
-  Star,
-  User,
-} from "lucide-react";
+import { BookOpen, Calendar, PlayCircle, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { fetchCurrentUser, type AuthUser } from "@/lib/auth";
 import api from "@/lib/axios";
 
 type RecommendedConsultant = {
@@ -24,20 +19,32 @@ type RecommendedConsultant = {
 };
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [recommendations, setRecommendations] = useState<
     RecommendedConsultant[]
   >([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    api.get("/user").then((res) => setUser(res.data));
-    api
-      .get("/dashboard/recommendations")
-      .then((res) => setRecommendations(res.data ?? []))
-      .catch(() => setRecommendations([]))
-      .finally(() => setLoadingRecommendations(false));
-  }, []);
+    fetchCurrentUser().then((currentUser) => {
+      setUser(currentUser);
+      setAuthChecked(true);
+
+      if (!currentUser) {
+        setLoadingRecommendations(false);
+        router.push("/login");
+        return;
+      }
+
+      api
+        .get("/api/dashboard/recommendations")
+        .then((res) => setRecommendations(res.data ?? []))
+        .catch(() => setRecommendations([]))
+        .finally(() => setLoadingRecommendations(false));
+    });
+  }, [router]);
 
   const ACTIONS = [
     {
@@ -79,6 +86,11 @@ export default function Dashboard() {
           <span className="font-medium text-slate-600">
             Hello, {user?.first_name || "Friend"}
           </span>
+          {authChecked && user?.system_role ? (
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              {user.system_role}
+            </span>
+          ) : null}
           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
             {user?.first_name?.[0] ?? "F"}
           </div>
@@ -86,6 +98,25 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto p-8 md:p-12">
+        {user && !user.onboarding_completed ? (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+            <p className="font-semibold">
+              Finish onboarding to unlock matching.
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              We&apos;ll still keep you on the dashboard, but completing
+              onboarding helps us personalize consultant recommendations.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding")}
+              className="mt-3 inline-flex rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700"
+            >
+              Complete onboarding
+            </button>
+          </div>
+        ) : null}
+
         <header className="mb-12">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">
             Mental Wellness Hub

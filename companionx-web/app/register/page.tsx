@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ChevronDownIcon } from "lucide-react";
-import api from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { register } from "@/lib/auth";
 
 export default function RegisterPage() {
   const [identity, setIdentity] = useState<"user" | "consultant">("user");
@@ -47,9 +47,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await api.post("/register", formData);
-      localStorage.setItem("token", response.data.token);
-      router.push("/login");
+      const { user } = await register(formData);
+      router.push(user.onboarding_completed ? "/dashboard" : "/onboarding");
     } catch (error: any) {
       console.error(
         "Registration failed:",
