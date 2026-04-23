@@ -40,6 +40,11 @@ class AuthController extends Controller
             'system_role' => $systemRole,
         ]);
 
+        if ($systemRole === 'consultant') {
+            ConsultantProfile::firstOrCreate([
+                'user_id' => $user->id,
+            ]);
+        }
         Auth::login($user);
         $request->session()->regenerate();
 
