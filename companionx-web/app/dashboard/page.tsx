@@ -11,6 +11,7 @@ import {
   Brain,
   PlayCircle,
   VideoCamera,
+  TrendUp,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/axios";
@@ -181,7 +182,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] bg-background">
-        <div className="mx-auto max-w-6xl px-8 py-10">
+        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
           <div className="mb-8 h-6 w-48 animate-pulse bg-muted" />
           <div className="mb-6 h-8 w-64 animate-pulse bg-muted" />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -194,55 +195,24 @@ export default function DashboardPage() {
   }
 
   if (user?.system_role === "consultant") {
-    return (
-      <div className="min-h-[calc(100vh-3.5rem)] bg-background">
-        <div className="mx-auto max-w-6xl px-8 py-10">
-          <header className="mb-8">
-            <p className="mb-1 font-sans text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-              Consultant Control Center
-            </p>
-            <h1 className="font-heading text-2xl font-semibold text-foreground">
-              Welcome back, {user?.first_name || "..."}
-            </h1>
-          </header>
-          <div className="border border-border p-8">
-            <h2 className="mb-3 font-heading text-xl font-semibold text-foreground">
-              Scheduling comes first.
-            </h2>
-            <p className="mb-6 max-w-lg font-sans text-sm leading-relaxed text-muted-foreground">
-              Build your consultant profile, set your base session rate, and
-              publish clear availability windows.
-            </p>
-            <Button
-              variant="default"
-              size="sm"
-              className="px-5 text-xs font-medium"
-              onClick={() => router.push("/dashboard/consultant")}
-            >
-              Open Consultant Dashboard
-              <ArrowRight size={14} weight="bold" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <ConsultantDashboard />;
   }
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
-      <div className="mx-auto max-w-6xl px-8 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
         {/* ── Page Header ────────────────────────────────────────────── */}
         <header className="mb-8">
           <div className="flex items-end justify-between">
             <div>
-              <p className="mb-1 font-sans text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+              <p className="mb-1 font-sans text-xs font-medium tracking-wider text-muted-foreground uppercase">
                 System Status: Active
               </p>
               <h1 className="font-heading text-2xl font-semibold text-foreground">
                 Clinical Overview
               </h1>
             </div>
-            <p className="font-sans text-[12px] text-muted-foreground">
+            <p className="font-sans text-xs text-muted-foreground">
               Last Sync:{" "}
               {new Date().toLocaleDateString("en-US", {
                 month: "short",
@@ -267,7 +237,7 @@ export default function DashboardPage() {
 
             <div className="p-6 pr-20">
               <div className="mb-4">
-                <span className="font-sans text-[10px] font-medium tracking-[0.12em] text-primary uppercase border border-primary/40 px-2 py-0.5">
+                <span className="font-sans text-xs font-medium tracking-[0.12em] text-primary uppercase border border-primary/40 px-2 py-0.5">
                   Next Appointment
                 </span>
               </div>
@@ -277,14 +247,14 @@ export default function DashboardPage() {
                   <p className="mb-1 font-heading text-lg font-medium text-foreground">
                     {appointment.consultant.specialization} Session
                   </p>
-                  <p className="mb-6 font-sans text-[13px] text-muted-foreground">
+                  <p className="mb-6 font-sans text-sm text-muted-foreground">
                     {appointment.consultant.name} &middot;{" "}
                     {appointment.consultant.specialization}
                   </p>
 
                   <div className="mb-6 flex items-center gap-10">
                     <div>
-                      <p className="font-sans text-[10px] font-medium tracking-[0.1em] text-muted-foreground uppercase">
+                      <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                         Starts In
                       </p>
                       <p className="mt-0.5 font-mono text-lg font-medium text-foreground">
@@ -292,7 +262,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="font-sans text-[10px] font-medium tracking-[0.1em] text-muted-foreground uppercase">
+                      <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                         Method
                       </p>
                       <p className="mt-0.5 font-sans text-sm text-foreground">
@@ -315,7 +285,7 @@ export default function DashboardPage() {
                   <p className="mb-1 font-heading text-lg font-medium text-foreground">
                     No upcoming appointment
                   </p>
-                  <p className="mb-5 max-w-xs font-sans text-[13px] leading-relaxed text-muted-foreground">
+                  <p className="mb-5 max-w-xs font-sans text-sm leading-relaxed text-muted-foreground">
                     Book a session with a professional consultant to start your
                     healing journey.
                   </p>
@@ -337,7 +307,7 @@ export default function DashboardPage() {
             <div className="h-full border border-border bg-card transition-colors hover:border-primary/30">
               <div className="p-6">
                 <div className="mb-4">
-                  <p className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                  <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                     Sentiment Analysis
                   </p>
                   <p className="mt-0.5 font-sans text-sm text-muted-foreground">
@@ -388,7 +358,7 @@ export default function DashboardPage() {
                           : "No data"}
                       </p>
                       {data?.mood_tracker?.average_score != null && (
-                        <p className="mt-0.5 font-sans text-[11px] text-primary">
+                        <p className="mt-0.5 font-sans text-xs text-primary">
                           +
                           {(
                             data.mood_tracker.average_score * 100
@@ -403,7 +373,7 @@ export default function DashboardPage() {
                     <p className="mb-1 font-heading text-sm font-medium text-foreground">
                       Start tracking your mood
                     </p>
-                    <p className="font-sans text-[12px] text-muted-foreground">
+                    <p className="font-sans text-xs text-muted-foreground">
                       Log how you feel today.
                     </p>
                   </div>
@@ -411,7 +381,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="border-t border-border px-6 py-2.5 text-center">
-                <span className="font-sans text-[10px] font-medium tracking-[0.1em] text-muted-foreground uppercase">
+                <span className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                   View Detailed Metrics
                 </span>
               </div>
@@ -456,23 +426,23 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex-1 p-5">
-                      <p className="mb-1.5 font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                      <p className="mb-1.5 font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         {getCategoryLabel(chapter.chapter_key)}
                       </p>
-                      <h3 className="mb-2 font-heading text-[15px] font-semibold text-foreground">
+                      <h3 className="mb-2 font-heading text-sm font-semibold text-foreground">
                         {chapter.chapter_title}
                       </h3>
-                      <p className="font-sans text-[12px] leading-relaxed text-muted-foreground">
+                      <p className="font-sans text-xs leading-relaxed text-muted-foreground">
                         {chapter.content}
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                      <span className="font-sans text-[11px] text-muted-foreground">
+                      <span className="font-sans text-xs text-muted-foreground">
                         {chapter.estimated_time}
                       </span>
                       <button
-                        className="font-sans text-[11px] font-semibold uppercase tracking-wider text-primary hover:opacity-80 transition-opacity"
+                        className="font-sans text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80 transition-opacity"
                         onClick={() => router.push("/dashboard/exercises")}
                       >
                         {isComplete ? "Review" : "Begin Exercise"}
@@ -487,13 +457,388 @@ export default function DashboardPage() {
               <p className="mb-1 font-heading text-sm font-medium text-foreground">
                 No exercises yet
               </p>
-              <p className="mx-auto max-w-sm font-sans text-[12px] text-muted-foreground">
+              <p className="mx-auto max-w-sm font-sans text-xs text-muted-foreground">
                 Complete onboarding to generate your personalized exercise plan.
               </p>
             </div>
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+type ConsultantDashboardData = {
+  consultant: {
+    id: number;
+    name: string;
+    email: string;
+    is_approved: boolean;
+    specialization: string;
+    bio: string | null;
+    base_rate_bdt: number;
+    average_rating: number;
+  };
+  stats: {
+    today_sessions: number;
+    total_patients: number;
+    pending_bookings: number;
+    upcoming_slots: number;
+    booked_slots: number;
+    held_slots: number;
+    available_slots: number;
+  };
+  today_schedule: ConsultantBooking[];
+  earnings: {
+    monthly_total: number;
+    change_percent: number;
+  };
+  session_requests: ConsultantBooking[];
+};
+
+type ConsultantBooking = {
+  id: number;
+  patient_ref: string;
+  patient_name: string;
+  status: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  price_at_booking: number;
+  jitsi_room_uuid: string;
+  is_first_time: boolean;
+};
+
+function ConsultantDashboard() {
+  const [data, setData] = useState<ConsultantDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    api
+      .get("/api/consultant/dashboard")
+      .then((res) => setData(res.data))
+      .catch((err) => {
+        console.error("Failed to fetch consultant dashboard", err);
+        setData(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleApprove = async (bookingId: number) => {
+    try {
+      await api.post(`/api/consultant/bookings/${bookingId}/approve`);
+      const res = await api.get("/api/consultant/dashboard");
+      setData(res.data);
+    } catch (err) {
+      console.error("Failed to approve booking", err);
+    }
+  };
+
+  const handleReject = async (bookingId: number) => {
+    try {
+      await api.post(`/api/consultant/bookings/${bookingId}/reject`);
+      const res = await api.get("/api/consultant/dashboard");
+      setData(res.data);
+    } catch (err) {
+      console.error("Failed to reject booking", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+          <div className="mb-8 h-6 w-48 animate-pulse bg-muted" />
+          <div className="mb-6 h-8 w-64 animate-pulse bg-muted" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="h-24 animate-pulse border border-border" />
+            <div className="h-24 animate-pulse border border-border" />
+            <div className="h-24 animate-pulse border border-border" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+          <p className="font-sans text-sm text-muted-foreground">
+            Failed to load dashboard data.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { consultant, stats, today_schedule, earnings, session_requests } = data;
+  const today = new Date();
+
+  return (
+    <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+        {/* ── Page Header ────────────────────────────────────────── */}
+        <header className="mb-8">
+          <p className="mb-1 font-sans text-xs text-muted-foreground uppercase">
+            Consultant Overview
+          </p>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            Welcome back, {consultant.name}
+          </h1>
+        </header>
+
+        {/* ── Stats Cards ────────────────────────────────────────── */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Today's Sessions"
+            value={String(stats.today_sessions)}
+          />
+          <StatCard
+            label="Total Patients"
+            value={stats.total_patients.toLocaleString()}
+          />
+          <StatCard
+            label="Pending Bookings"
+            value={String(stats.pending_bookings).padStart(2, "0")}
+            highlight
+          />
+        </div>
+
+        {/* ── Main Content: Schedule + Earnings ──────────────────── */}
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
+          {/* Today's Schedule */}
+          <div className="border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h2 className="font-heading text-base font-semibold text-foreground">
+                Daily Schedule
+              </h2>
+              <span className="font-sans text-xs text-muted-foreground">
+                {today.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+
+            {today_schedule.length > 0 ? (
+              <div>
+                {today_schedule.map((session, i) => {
+                  const startTime = new Date(session.scheduled_start);
+                  const endTime = new Date(session.scheduled_end);
+                  const isCurrent =
+                    new Date() >= startTime && new Date() <= endTime;
+                  const isPast = new Date() > endTime;
+
+                  return (
+                    <div
+                      key={session.id}
+                      className={`flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 last:border-b-0 ${
+                        isCurrent ? "bg-primary/5" : ""
+                      } ${isPast ? "opacity-50" : ""}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono text-sm text-muted-foreground shrink-0">
+                          {startTime.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <div>
+                          {isCurrent ? (
+                            <span className="font-sans text-xs font-medium text-primary">
+                              CURRENT SESSION
+                            </span>
+                          ) : null}
+                          <p className="font-sans text-sm font-medium text-foreground">
+                            {session.patient_ref}
+                          </p>
+                          {session.is_first_time ? (
+                            <span className="font-sans text-xs text-muted-foreground">
+                              First-time Consultation
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 sm:ml-auto">
+                        {isCurrent ? (
+                          <Button
+                            size="sm"
+                            className="text-xs font-medium"
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/room?room=${session.jitsi_room_uuid}`,
+                              )
+                            }
+                          >
+                            Resume Call
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs font-medium"
+                          >
+                            View Notes
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-6 py-10 text-center">
+                <p className="font-sans text-sm text-muted-foreground">
+                  No sessions scheduled for today.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Earnings Snapshot */}
+          <div className="space-y-4">
+            <p className="font-sans text-xs text-muted-foreground uppercase">
+              Earnings Snapshot
+            </p>
+            <div className="border border-border bg-foreground p-6 text-background">
+              <p className="font-sans text-xs text-background/60 uppercase">
+                Total BDT (This Month)
+              </p>
+              <p className="mt-2 font-heading text-2xl font-semibold">
+                ৳{earnings.monthly_total.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+              </p>
+              {earnings.change_percent !== 0 && (
+                <div className="mt-3 flex items-center gap-1">
+                  <TrendUp size={14} weight="bold" className={earnings.change_percent >= 0 ? "text-emerald-400" : "text-red-400"} />
+                  <span className={`font-sans text-xs ${earnings.change_percent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {earnings.change_percent >= 0 ? "+" : ""}
+                    {earnings.change_percent}% vs last month
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            <p className="font-sans text-xs text-muted-foreground uppercase mt-6">
+              Quick Actions
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-between text-xs font-medium"
+              onClick={() => router.push("/dashboard/consultant")}
+            >
+              New Availability Slot
+              <ArrowRight size={14} weight="bold" />
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Session Requests ───────────────────────────────────── */}
+        {session_requests.length > 0 && (
+          <section>
+            <h2 className="mb-4 font-heading text-base font-semibold text-foreground">
+              Session Requests
+            </h2>
+            <div className="border border-border bg-card">
+              {/* Table header */}
+              <div className="grid grid-cols-4 border-b border-border bg-muted/30 px-6 py-3">
+                <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
+                  Patient Ref
+                </span>
+                <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
+                  Requested Time
+                </span>
+                <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
+                  Status
+                </span>
+                <span className="font-sans text-xs font-semibold text-muted-foreground uppercase text-right">
+                  Actions
+                </span>
+              </div>
+
+              {session_requests.map((req) => {
+                const reqTime = new Date(req.scheduled_start);
+                return (
+                  <div
+                    key={req.id}
+                    className="grid grid-cols-4 items-center border-b border-border/50 px-6 py-4 last:border-b-0"
+                  >
+                    <div>
+                      <p className="font-sans text-sm font-medium text-foreground">
+                        {req.patient_ref}
+                      </p>
+                      {req.is_first_time ? (
+                        <span className="font-sans text-xs text-muted-foreground">
+                          First-time Consultation
+                        </span>
+                      ) : (
+                        <span className="font-sans text-xs text-muted-foreground">
+                          Follow-up Session
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-sans text-sm text-muted-foreground">
+                      {reqTime.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                      ,{" "}
+                      {reqTime.toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="font-sans text-xs font-medium text-muted-foreground uppercase border border-border px-2 py-0.5 w-fit">
+                      Pending
+                    </span>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs font-medium"
+                        onClick={() => handleReject(req.id)}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="text-xs font-medium"
+                        onClick={() => handleApprove(req.id)}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="border border-border bg-card p-6">
+      <p className="font-sans text-xs text-muted-foreground uppercase">
+        {label}
+      </p>
+      <p className={`mt-2 font-heading text-3xl font-semibold ${highlight ? "text-primary" : "text-foreground"}`}>
+        {value}
+      </p>
     </div>
   );
 }

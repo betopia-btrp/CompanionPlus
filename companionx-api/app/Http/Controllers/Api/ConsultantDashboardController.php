@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Services\ConsultantSchedulingService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ConsultantDashboardController extends Controller
 {
@@ -60,5 +62,39 @@ class ConsultantDashboardController extends Controller
         return response()->json([
             'message' => 'Availability slot removed.',
         ]);
+    }
+
+    public function approveBooking(Request $request, int $bookingId)
+    {
+        $profile = $request->user()->consultantProfile;
+
+        if (!$profile) {
+            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
+        }
+
+        $booking = Booking::where('consultant_id', $profile->id)
+            ->where('status', 'pending')
+            ->findOrFail($bookingId);
+
+        $booking->update(['status' => 'confirmed']);
+
+        return response()->json(['message' => 'Booking confirmed.']);
+    }
+
+    public function rejectBooking(Request $request, int $bookingId)
+    {
+        $profile = $request->user()->consultantProfile;
+
+        if (!$profile) {
+            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
+        }
+
+        $booking = Booking::where('consultant_id', $profile->id)
+            ->where('status', 'pending')
+            ->findOrFail($bookingId);
+
+        $booking->update(['status' => 'cancelled']);
+
+        return response()->json(['message' => 'Booking rejected.']);
     }
 }

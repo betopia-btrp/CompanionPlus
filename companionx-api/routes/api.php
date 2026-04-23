@@ -82,5 +82,13 @@ Route::middleware("auth:sanctum")->group(function () {
             ConsultantDashboardController::class,
             "destroySlot",
         ]);
+        Route::post("/consultant/bookings/{bookingId}/approve", [
+            ConsultantDashboardController::class,
+            "approveBooking",
+        ]);
+        Route::post("/consultant/bookings/{bookingId}/reject", [
+            ConsultantDashboardController::class,
+            "rejectBooking",
+        ]);
     });
 });
