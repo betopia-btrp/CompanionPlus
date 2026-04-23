@@ -194,21 +194,11 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12">
-<<<<<<< HEAD
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 flex items-center justify-between">
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-2 font-bold text-slate-500 transition hover:text-blue-600"
-=======
-      <div className="max-w-7xl mx-auto">
-        
-        {/* TOP NAVIGATION & BACK BUTTON */}
-        <div className="mb-8">
-          <Link 
-            href="/dashboard" 
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 transition font-medium"
->>>>>>> main
           >
             <ArrowLeft size={20} /> Back to Hub
           </Link>

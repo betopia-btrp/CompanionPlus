@@ -199,7 +199,7 @@ export default function ExercisesPage() {
         typeof (error as { response?: { data?: { message?: string } } }).response
           ?.data?.message === "string"
           ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message
+              ?.data?.message ?? "Could not update exercise progress."
           : "Could not update exercise progress.";
 
       setStatusMessage(message);
@@ -244,7 +244,7 @@ export default function ExercisesPage() {
         typeof (error as { response?: { data?: { message?: string } } }).response
           ?.data?.message === "string"
           ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message
+              ?.data?.message ?? "Could not save your reflection."
           : "Could not save your reflection.";
 
       setStatusMessage(message);

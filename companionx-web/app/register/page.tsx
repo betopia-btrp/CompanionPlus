@@ -54,14 +54,24 @@ export default function RegisterPage() {
     try {
       const { user } = await register(formData);
       router.push(user.onboarding_completed ? "/dashboard" : "/onboarding");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as {
+        response?: { data?: RegisterErrorResponse };
+        message?: string;
+      };
+      const responseData = axiosError.response?.data;
+      const firstValidationMessage = responseData?.errors
+        ? Object.values(responseData.errors).flat()[0]
+        : undefined;
+      const fallbackMessage = axiosError.message ?? "Registration failed.";
+
       console.error(
         "Registration failed:",
-        axiosError.response?.data || axiosError.message,
+        responseData || fallbackMessage,
       );
       alert(
         firstValidationMessage ||
-          axiosError.response?.data?.message ||
+          responseData?.message ||
           fallbackMessage,
       );
     } finally {
