@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ChevronDownIcon } from "lucide-react";
-import { AxiosError } from "axios";
-import api from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { register } from "@/lib/auth";
 
 type RegisterErrorResponse = {
   message?: string;
@@ -53,26 +52,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await api.post("/register", {
-        ...formData,
-        system_role: identity === "consultant" ? "consultant" : "patient",
-      });
-      localStorage.setItem("token", response.data.token);
-      router.push("/login");
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError<RegisterErrorResponse>;
-      const validationErrors = axiosError.response?.data?.errors;
-      const firstValidationError =
-        validationErrors && typeof validationErrors === "object"
-          ? Object.values(validationErrors)[0]
-          : null;
-      const firstValidationMessage = Array.isArray(firstValidationError)
-        ? firstValidationError[0]
-        : null;
-      const fallbackMessage = !axiosError.response
-        ? "Registration could not reach the API. Check NEXT_PUBLIC_API_URL for your Herd backend."
-        : "Registration failed. Check your details.";
-
+      const { user } = await register(formData);
+      router.push(user.onboarding_completed ? "/dashboard" : "/onboarding");
+    } catch (error: any) {
       console.error(
         "Registration failed:",
         axiosError.response?.data || axiosError.message,

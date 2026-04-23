@@ -6,26 +6,18 @@ const configuredApiBaseUrl =
   process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL;
 
 const api = axios.create({
-  baseURL: configuredApiBaseUrl ?? defaultApiBaseUrl,
+  baseURL:
+    process.env.NEXT_PUBLIC_API_URL ??
+    process.env.BACKEND_URL ??
+    "http://localhost:8000",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-});
-
-if (!configuredApiBaseUrl && typeof window !== "undefined") {
-  console.warn(
-    `NEXT_PUBLIC_API_URL is not set. Falling back to ${defaultApiBaseUrl}.`,
-  );
-}
-
-api.interceptors.request.use((config) => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
+  withXSRFToken: true,
+  xsrfCookieName: "XSRF-TOKEN",
+  xsrfHeaderName: "X-XSRF-TOKEN",
 });
 
 export default api;

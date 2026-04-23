@@ -117,6 +117,8 @@ export default function JournalPage() {
   const [dashboard, setDashboard] = useState<JournalDashboard>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  
+  // FORM STATE
   const [newNote, setNewNote] = useState("");
   const [selectedMood, setSelectedMood] = useState<MoodOption>(moodOptions[0]);
   const [saving, setSaving] = useState(false);
@@ -598,7 +600,6 @@ export default function JournalPage() {
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
               />
-
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowModal(false)}

@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
+<<<<<<< HEAD
 import { BookOpen, Calendar, LayoutDashboard, PlayCircle, Star } from "lucide-react";
+=======
+import { BookOpen, Calendar, PlayCircle, Star } from "lucide-react";
+>>>>>>> main
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { fetchCurrentUser, type AuthUser } from "@/lib/auth";
 import api from "@/lib/axios";
 
 type RecommendedConsultant = {
@@ -34,12 +40,22 @@ type CurrentUser = {
 };
 
 export default function Dashboard() {
+<<<<<<< HEAD
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [recommendationData, setRecommendationData] =
     useState<RecommendationResponse | null>(null);
+=======
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [recommendations, setRecommendations] = useState<
+    RecommendedConsultant[]
+  >([]);
+>>>>>>> main
   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
+<<<<<<< HEAD
     let ignore = false;
 
     api.get("/user").then((res) => {
@@ -52,10 +68,20 @@ export default function Dashboard() {
       if (res.data?.system_role === "consultant") {
         setLoadingRecommendations(false);
 
+=======
+    fetchCurrentUser().then((currentUser) => {
+      setUser(currentUser);
+      setAuthChecked(true);
+
+      if (!currentUser) {
+        setLoadingRecommendations(false);
+        router.push("/login");
+>>>>>>> main
         return;
       }
 
       api
+<<<<<<< HEAD
         .get("/dashboard/recommendations")
         .then((recommendationRes) => {
           if (!ignore) {
@@ -82,6 +108,14 @@ export default function Dashboard() {
       ignore = true;
     };
   }, []);
+=======
+        .get("/api/dashboard/recommendations")
+        .then((res) => setRecommendations(res.data ?? []))
+        .catch(() => setRecommendations([]))
+        .finally(() => setLoadingRecommendations(false));
+    });
+  }, [router]);
+>>>>>>> main
 
   const isConsultant = user?.system_role === "consultant";
 
@@ -141,13 +175,45 @@ export default function Dashboard() {
           <span className="font-medium text-slate-600">
             Hello, {user?.first_name || "Friend"}
           </span>
+<<<<<<< HEAD
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-600">
+=======
+          {authChecked && user?.system_role ? (
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              {user.system_role}
+            </span>
+          ) : null}
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+>>>>>>> main
             {user?.first_name?.[0] ?? "F"}
           </div>
         </div>
       </nav>
 
+<<<<<<< HEAD
       <main className="mx-auto max-w-7xl p-8 md:p-12">
+=======
+      <main className="max-w-7xl mx-auto p-8 md:p-12">
+        {user && !user.onboarding_completed ? (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+            <p className="font-semibold">
+              Finish onboarding to unlock matching.
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              We&apos;ll still keep you on the dashboard, but completing
+              onboarding helps us personalize consultant recommendations.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding")}
+              className="mt-3 inline-flex rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700"
+            >
+              Complete onboarding
+            </button>
+          </div>
+        ) : null}
+
+>>>>>>> main
         <header className="mb-12">
           <h1 className="mb-2 text-4xl font-bold text-slate-900">
             {isConsultant ? "Consultant Control Center" : "Mental Wellness Hub"}

@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\AnalyzeJournalSentiment;
-use App\Jobs\GenerateMentalExercises;
 use App\Models\MoodJournal;
+use App\Jobs\AnalyzeJournalSentiment;
+use App\Jobs\GenerateMentalExercises; // Added this
+use App\Services\ExerciseService;
 use Illuminate\Http\Request;
 use App\Services\JournalInsightsService;
 use App\Services\SentimentAnalysisService;
@@ -24,8 +25,11 @@ class JournalController extends Controller
             'text_note' => 'nullable|string',
         ]);
 
+        $userId = $request->user()->id;
+
+        // 1. Create the journal entry
         $journal = MoodJournal::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $userId,
             'emoji_mood' => $request->emoji_mood,
             'text_note' => $request->text_note,
         ]);

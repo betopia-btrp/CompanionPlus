@@ -8,7 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ConsultantProfile extends Model
 {
-    protected $fillable = ['user_id', 'specialization', 'bio', 'base_rate_bdt', 'is_approved', 'average_rating'];
+    protected $table = 'consultant_profiles';
+
+    protected $fillable = [
+        'user_id', 
+        'specialization', 
+        'bio', 
+        'base_rate_bdt', 
+        'is_approved', 
+        'average_rating'
+    ];
 
     protected function casts(): array
     {
