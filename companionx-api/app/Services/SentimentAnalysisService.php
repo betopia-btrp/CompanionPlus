@@ -115,11 +115,11 @@ class SentimentAnalysisService
         $normalized = Str::lower(trim($moodSignal));
 
         return match ($normalized) {
-            'ðŸ˜Š', 'happy', 'good', 'calm' => 'happy',
-            'ðŸ˜', 'neutral', 'okay' => 'neutral',
-            'ðŸ˜”', 'sad', 'low' => 'sad',
-            'ðŸ˜°', 'anxious', 'worried' => 'anxious',
-            'ðŸ˜¡', 'angry', 'frustrated' => 'angry',
+            '😊', 'happy', 'good', 'calm' => 'happy',
+            '😐', 'neutral', 'okay' => 'neutral',
+            '😔', 'sad', 'low' => 'sad',
+            '😰', 'anxious', 'worried' => 'anxious',
+            '😡', 'angry', 'frustrated' => 'angry',
             default => $normalized,
         };
     }
