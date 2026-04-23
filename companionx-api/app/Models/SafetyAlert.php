@@ -5,27 +5,28 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Subscription extends Model
+class SafetyAlert extends Model
 {
     protected $fillable = [
-        'user_id',
-        'stripe_subscription_id',
-        'tier',
+        'journal_id',
+        'patient_id',
         'status',
-        'current_period_end',
+        'severity',
+        'assigned_admin_id',
+        'resolved_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'current_period_end' => 'datetime',
+            'resolved_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
     }
 
-    public function user(): BelongsTo
+    public function journal(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(MoodJournal::class, 'journal_id');
     }
 }

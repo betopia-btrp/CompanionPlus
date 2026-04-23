@@ -3,27 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\AnalyzeJournalSentiment;
+use App\Jobs\GenerateMentalExercises;
 use App\Models\MoodJournal;
 use Illuminate\Http\Request;
+use App\Services\JournalInsightsService;
+use App\Services\SentimentAnalysisService;
 
 class JournalController extends Controller
 {
-    // Fetch all journals for the logged-in user
-    public function index(Request $request)
+    public function index(Request $request, JournalInsightsService $journalInsightsService)
     {
-        $journals = MoodJournal::where('user_id', $request->user()->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json($journals);
+        return response()->json($journalInsightsService->buildPayload($request->user()->id));
     }
 
-    // Save a new entry
-    public function store(Request $request)
+    public function store(Request $request, SentimentAnalysisService $sentimentAnalysisService)
     {
         $request->validate([
             'emoji_mood' => 'required|string',
-            'text_note' => 'nullable|string'
+            'text_note' => 'nullable|string',
         ]);
 
         $journal = MoodJournal::create([
@@ -32,13 +30,17 @@ class JournalController extends Controller
             'text_note' => $request->text_note,
         ]);
 
+        AnalyzeJournalSentiment::dispatch($journal->id);
+        GenerateMentalExercises::dispatch($journal->id);
+
         return response()->json([
             'message' => 'Journal entry saved!',
-            'data' => $journal
+            'data' => $sentimentAnalysisService->buildEntryPayload($journal),
+            'analysis_status' => 'queued',
+            'exercise_status' => 'queued',
         ], 201);
     }
 
-    // Delete an entry
     public function destroy(Request $request, $id)
     {
         $journal = MoodJournal::where('user_id', $request->user()->id)->findOrFail($id);

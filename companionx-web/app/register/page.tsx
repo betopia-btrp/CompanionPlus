@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ChevronDownIcon } from "lucide-react";
+import { AxiosError } from "axios";
 import api from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -23,6 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+type RegisterErrorResponse = {
+  message?: string;
+  errors?: Record<string, string[]>;
+};
 
 export default function RegisterPage() {
   const [identity, setIdentity] = useState<"user" | "consultant">("user");
@@ -47,17 +53,34 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await api.post("/register", formData);
+      const response = await api.post("/register", {
+        ...formData,
+        system_role: identity === "consultant" ? "consultant" : "patient",
+      });
       localStorage.setItem("token", response.data.token);
       router.push("/login");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<RegisterErrorResponse>;
+      const validationErrors = axiosError.response?.data?.errors;
+      const firstValidationError =
+        validationErrors && typeof validationErrors === "object"
+          ? Object.values(validationErrors)[0]
+          : null;
+      const firstValidationMessage = Array.isArray(firstValidationError)
+        ? firstValidationError[0]
+        : null;
+      const fallbackMessage = !axiosError.response
+        ? "Registration could not reach the API. Check NEXT_PUBLIC_API_URL for your Herd backend."
+        : "Registration failed. Check your details.";
+
       console.error(
         "Registration failed:",
-        error.response?.data || error.message,
+        axiosError.response?.data || axiosError.message,
       );
       alert(
-        error.response?.data?.message ||
-          "Registration failed. Check your details.",
+        firstValidationMessage ||
+          axiosError.response?.data?.message ||
+          fallbackMessage,
       );
     } finally {
       setLoading(false);

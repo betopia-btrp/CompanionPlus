@@ -34,16 +34,16 @@ class GenerateConsultantRecommendations implements ShouldQueue
     public function handle(MatchingService $matchingService): void
     {
         try {
-            $recommendations = $matchingService->getRecommendedConsultants($this->userId);
+            $recommendationPayload = $matchingService->generateRecommendationPayload($this->userId);
 
-            if (!empty($recommendations)) {
+            if (!empty($recommendationPayload)) {
                 AiRecommendation::updateOrCreate(
                     [
                         'user_id' => $this->userId,
                         'rec_type' => 'consultant_match',
                     ],
                     [
-                        'content_json' => $recommendations,
+                        'content_json' => $recommendationPayload,
                     ]
                 );
             }
