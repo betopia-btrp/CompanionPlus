@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\MoodJournal;
 use App\Models\SafetyAlert;
-use App\Services\GeminiService;
+use App\Services\SentimentAnalysisService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -16,75 +16,50 @@ class AnalyzeJournalSentiment implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    // Reliability settings
     public int $tries = 3;
+
     public int $timeout = 120;
 
-    public function __construct(protected MoodJournal $journal)
+    public function __construct(public readonly int $journalId)
     {
-        //
+        $this->onQueue('default');
     }
 
-    public function handle(GeminiService $gemini): void
+    public function handle(SentimentAnalysisService $sentimentAnalysisService): void
     {
-        // 1. Double check if record exists and has text
-        if (!$this->journal->exists || empty($this->journal->text_note)) {
+        $journal = MoodJournal::find($this->journalId);
+
+        if (!$journal instanceof MoodJournal) {
+            Log::warning('AnalyzeJournalSentiment: Journal not found.', ['journal_id' => $this->journalId]);
+
             return;
         }
 
-        $systemPrompt = "You are a Psychiatric Sentiment Analyzer. 
-        Return ONLY a JSON object with:
-        'sentiment_score': float (0.0 to 1.0)
-        'is_at_risk': boolean (true if self-harm/suicide detected)";
+        $analysis = $sentimentAnalysisService->analyze($journal);
 
-        $userPrompt = "Journal Entry: " . $this->journal->text_note;
+        $journal->update([
+            'sentiment_score' => $analysis['sentiment_score'],
+            'is_at_risk' => $analysis['is_at_risk'],
+            'analysis_json' => [
+                'dominant_state' => $analysis['dominant_state'] ?? null,
+                'emotional_shift' => $analysis['emotional_shift'] ?? null,
+                'intensity' => $analysis['intensity'] ?? null,
+                'recommended_focus' => $analysis['recommended_focus'] ?? null,
+                'supportive_insight' => $analysis['supportive_insight'] ?? null,
+                'severity' => $analysis['severity'] ?? null,
+                'risk_summary' => $analysis['risk_summary'] ?? null,
+            ],
+        ]);
 
-        try {
-            // 2. Call Gemini
-            $result = $gemini->generate($systemPrompt, $userPrompt);
-
-            // 3. Debug Logging (Check your laravel.log to see this!)
-            if (!$result) {
-                Log::error("Sentiment Analysis: Gemini returned NULL for Journal ID: " . $this->journal->id);
-                return;
-            }
-
-            Log::info("Sentiment Analysis: AI Response for Journal " . $this->journal->id, $result);
-
-            // 4. Update with Data Validation (Handles cases where keys are missing)
-            $this->journal->update([
-                'sentiment_score' => $result['sentiment_score'] ?? 0.5,
-                'is_at_risk' => (bool) ($result['is_at_risk'] ?? false),
-            ]);
-
-            // 5. Trigger Safety Protocol
-            if ($this->journal->is_at_risk) {
-                $this->triggerSafetyAlert();
-            }
-
-        } catch (\Exception $e) {
-            Log::error("Sentiment Analysis Job failed: " . $e->getMessage());
-            $this->fail($e);
-        }
-    }
-
-    private function triggerSafetyAlert()
-    {
-        try {
-            // Ensure record isn't duplicated for same entry
+        if (($analysis['is_at_risk'] ?? false) === true) {
             SafetyAlert::updateOrCreate(
-                ['journal_id' => $this->journal->id],
+                ['journal_id' => $journal->id],
                 [
-                    'patient_id' => $this->journal->user_id,
+                    'patient_id' => $journal->user_id,
                     'status' => 'new',
-                    'severity' => 'critical',
-                    'created_at' => now(),
+                    'severity' => $analysis['severity'] ?? 'high',
                 ]
             );
-
-            Log::warning("CRITICAL SAFETY ALERT CREATED for User: " . $this->journal->user_id);
-        } catch (\Exception $e) {
-            Log::error("Failed to create SafetyAlert: " . $e->getMessage());
         }
     }
 }

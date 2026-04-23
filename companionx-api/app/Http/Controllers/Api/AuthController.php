@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ConsultantProfile;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +23,10 @@ class AuthController extends Controller
             'dob' => 'required|date',
             'gender' => 'required|string',
             'guardian_contact' => 'nullable|string',
+            'system_role' => 'nullable|string|in:patient,consultant',
         ]);
+
+        $systemRole = $request->string('system_role')->trim()->value() ?: 'patient';
 
         $user = User::create([
             'first_name' => $request->first_name,
@@ -33,9 +37,14 @@ class AuthController extends Controller
             'dob' => $request->dob,
             'gender' => $request->gender,
             'guardian_contact' => $request->guardian_contact,
-            'system_role' => 'patient', 
+            'system_role' => $systemRole,
         ]);
 
+        if ($systemRole === 'consultant') {
+            ConsultantProfile::firstOrCreate([
+                'user_id' => $user->id,
+            ]);
+        }
         Auth::login($user);
         $request->session()->regenerate();
 

@@ -1,5 +1,10 @@
 import axios from "axios";
 
+const defaultApiBaseUrl = "http://companionx-api.test/api";
+
+const configuredApiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL;
+
 const api = axios.create({
   baseURL:
     process.env.NEXT_PUBLIC_API_URL ??

@@ -24,6 +24,11 @@ import {
 } from "@/components/ui/select";
 import { register } from "@/lib/auth";
 
+type RegisterErrorResponse = {
+  message?: string;
+  errors?: Record<string, string[]>;
+};
+
 export default function RegisterPage() {
   const [identity, setIdentity] = useState<"user" | "consultant">("user");
   const [date, setDate] = useState<Date | undefined>(undefined);
@@ -49,14 +54,25 @@ export default function RegisterPage() {
     try {
       const { user } = await register(formData);
       router.push(user.onboarding_completed ? "/dashboard" : "/onboarding");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as {
+        response?: { data?: RegisterErrorResponse };
+        message?: string;
+      };
+      const responseData = axiosError.response?.data;
+      const firstValidationMessage = responseData?.errors
+        ? Object.values(responseData.errors).flat()[0]
+        : undefined;
+      const fallbackMessage = axiosError.message ?? "Registration failed.";
+
       console.error(
         "Registration failed:",
-        error.response?.data || error.message,
+        responseData || fallbackMessage,
       );
       alert(
-        error.response?.data?.message ||
-          "Registration failed. Check your details.",
+        firstValidationMessage ||
+          responseData?.message ||
+          fallbackMessage,
       );
     } finally {
       setLoading(false);

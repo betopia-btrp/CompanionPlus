@@ -2,70 +2,154 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GeminiService
 {
-    private ?string $apiKey;
+    private const DEFAULT_TIMEOUT_SECONDS = 45;
+
+    private string $apiKey;
+
     private string $model;
+
+    private string $apiVersion;
+
+    private string $baseUrl;
 
     public function __construct()
     {
-        $this->apiKey = config('services.gemini.api_key');
-        $this->model = config('services.gemini.model', 'gemini-1.5-flash');
+        $this->apiKey = (string) config('services.gemini.api_key', '');
+        $this->model = (string) config('services.gemini.model', 'gemini-1.5-flash');
+        $this->apiVersion = (string) config('services.gemini.api_version', 'v1');
+        $this->baseUrl = rtrim((string) config('services.gemini.base_url', 'https://generativelanguage.googleapis.com'), '/');
     }
 
-    public function generate(string $systemPrompt, string $userPrompt): ?array
+    public function generateJson(string $prompt, array $options = []): ?array
     {
         if (blank($this->apiKey)) {
-            Log::error('GeminiService: API Key is missing.');
+            Log::warning('GeminiService: GEMINI_API_KEY is not configured.');
+
             return null;
         }
 
-        // We use the stable v1 endpoint
-        $url = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:generateContent?key={$this->apiKey}";
-
         $payload = [
-            'contents' => [
-                [
-                    'parts' => [
-                        ['text' => "SYSTEM INSTRUCTION: $systemPrompt\n\nUSER INPUT: $userPrompt\n\nIMPORTANT: Return ONLY a raw JSON object/array. No markdown. No conversational text."]
-                    ]
-                ]
-            ],
-            'generationConfig' => [
-                'temperature' => 0.5,
-            ]
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [[
+                    'text' => $prompt,
+                ]],
+            ]],
+            'safetySettings' => $options['safety_settings'] ?? $this->mentalHealthSafetySettings(),
+            'generationConfig' => array_filter([
+                'temperature' => $options['temperature'] ?? 0.2,
+                'maxOutputTokens' => $options['max_output_tokens'] ?? 2048,
+                'response_mime_type' => 'application/json',
+            ], static fn ($value) => $value !== null),
         ];
 
+        if (!empty($options['response_schema'])) {
+            $payload['generationConfig']['response_schema'] = $options['response_schema'];
+        }
+
+        if (!empty($options['system_instruction'])) {
+            $payload['systemInstruction'] = [
+                'parts' => [[
+                    'text' => $options['system_instruction'],
+                ]],
+            ];
+        }
+
         try {
-            $response = Http::timeout(30)->post($url, $payload);
+            $response = Http::timeout($options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS)
+                ->retry(2, 500, throw: false)
+                ->withHeaders([
+                    'x-goog-api-key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($this->endpoint(), $payload);
 
             if ($response->failed()) {
-                Log::error('GeminiService API Error: ', [
+                Log::error('GeminiService: API request failed.', [
                     'status' => $response->status(),
-                    'body' => $response->json()
+                    'body' => $response->body(),
                 ]);
+
                 return null;
             }
 
             $content = data_get($response->json(), 'candidates.0.content.parts.0.text');
 
-            if (blank($content)) {
-                Log::warning('GeminiService: Empty content returned.');
+            if (!is_string($content) || trim($content) === '') {
+                Log::warning('GeminiService: Empty response content.', [
+                    'prompt_feedback' => data_get($response->json(), 'promptFeedback'),
+                ]);
+
                 return null;
             }
 
-            // Remove any markdown code block wrappers
-            $cleanJson = preg_replace('/^```json|```$/m', '', $content);
-            $decoded = json_decode(trim($cleanJson), true);
+            $cleanedContent = $this->cleanJsonContent($content);
+            $decoded = json_decode($cleanedContent, true);
 
-            return is_array($decoded) ? $decoded : null;
+            if (!is_array($decoded)) {
+                Log::warning('GeminiService: Failed to decode JSON response.', [
+                    'raw_content' => $cleanedContent,
+                    'json_error' => json_last_error_msg(),
+                ]);
 
-        } catch (\Exception $e) {
-            Log::error('GeminiService Exception: ' . $e->getMessage());
-            return null;
+                return null;
+            }
+
+            return $decoded;
+        } catch (RequestException $exception) {
+            Log::error('GeminiService: Request exception.', [
+                'message' => $exception->getMessage(),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::error('GeminiService: Unexpected exception.', [
+                'message' => $exception->getMessage(),
+            ]);
         }
+
+        return null;
+    }
+
+    private function endpoint(): string
+    {
+        return sprintf('%s/%s/models/%s:generateContent', $this->baseUrl, $this->apiVersion, $this->model);
+    }
+
+    private function cleanJsonContent(string $content): string
+    {
+        $cleaned = preg_replace('/^```json|```$/m', '', trim($content));
+
+        return is_string($cleaned) ? trim($cleaned) : trim($content);
+    }
+
+    private function mentalHealthSafetySettings(): array
+    {
+        return [
+            [
+                'category' => 'HARM_CATEGORY_HARASSMENT',
+                'threshold' => 'BLOCK_NONE',
+            ],
+            [
+                'category' => 'HARM_CATEGORY_HATE_SPEECH',
+                'threshold' => 'BLOCK_NONE',
+            ],
+            [
+                'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                'threshold' => 'BLOCK_NONE',
+            ],
+            [
+                'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                'threshold' => 'BLOCK_NONE',
+            ],
+            [
+                'category' => 'HARM_CATEGORY_CIVIC_INTEGRITY',
+                'threshold' => 'BLOCK_NONE',
+            ],
+        ];
     }
 }

@@ -1,0 +1,22 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('mood_journal', function (Blueprint $table) {
+            $table->jsonb('analysis_json')->nullable()->after('is_at_risk');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('mood_journal', function (Blueprint $table) {
+            $table->dropColumn('analysis_json');
+        });
+    }
+};

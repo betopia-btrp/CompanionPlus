@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Collection;
-use App\Models\OnboardingAnswer;
 use App\Models\ConsultantProfile;
-use Illuminate\Support\Facades\Http;
+use App\Models\OnboardingAnswer;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -30,172 +29,268 @@ class MatchingService
         'exam anxiety',
     ];
 
-    public function getRecommendedConsultants(int $userId): array
+    private const THERAPY_STYLE_HINTS = [
+        'action-oriented (cbt/tools)' => ['cbt', 'tools', 'mindfulness', 'stress management', 'coach'],
+        'gentle & empathetic (listening)' => ['listening', 'support', 'counselor', 'therapist', 'grief'],
+        'deep-dive (past/childhood)' => ['trauma', 'family', 'relationship', 'childhood'],
+        'i am not sure' => ['support', 'general', 'wellness'],
+    ];
+
+    public function __construct(private readonly GeminiService $geminiService)
     {
-        try {
-            $answers = OnboardingAnswer::where('user_id', $userId)->get(['question_key', 'answer_text']);
-            $consultantsQuery = ConsultantProfile::where('is_approved', true)
-                ->with('user:id,first_name,last_name')
-                ->select(['id', 'user_id', 'specialization', 'bio']);
-
-            if ($answers->isEmpty()) {
-                Log::warning('MatchingService: No onboarding answers found for user.', ['user_id' => $userId]);
-                return [];
-            }
-
-            $keywords = $this->extractKeywordsWithGemini($answers);
-
-            if (empty($keywords)) {
-                $keywords = $this->fallbackKeywords($answers);
-            }
-
-            $shortlist = $this->buildShortlist($consultantsQuery, $keywords);
-
-            if ($shortlist->isEmpty()) {
-                $shortlist = ConsultantProfile::where('is_approved', true)
-                    ->with('user:id,first_name,last_name')
-                    ->select(['id', 'user_id', 'specialization', 'bio'])
-                    ->get();
-            }
-
-            if ($shortlist->isEmpty()) {
-                Log::warning("MatchingService: No approved consultants found in DB.");
-                return [];
-            }
-
-            $ranked = $this->rankConsultants($shortlist, $keywords);
-
-            return $ranked->take(2)->values()->all();
-
-        } catch (\Exception $e) {
-            Log::error('MatchingService Exception: ' . $e->getMessage(), ['user_id' => $userId]);
-            return [];
-        }
     }
 
-    private function extractKeywordsWithGemini(Collection $answers): array
+    public function generateRecommendationPayload(int $userId): array
     {
-        $apiKey = config('services.gemini.api_key');
-        $model = config('services.gemini.model');
+        $answers = OnboardingAnswer::where('user_id', $userId)
+            ->orderBy('id')
+            ->get(['question_key', 'answer_text']);
 
-        if (blank($apiKey) || blank($model)) {
-            Log::warning('MatchingService: GEMINI_API_KEY is not configured.');
-            return [];
+        $consultants = ConsultantProfile::where('is_approved', true)
+            ->with('user:id,first_name,last_name,gender')
+            ->select(['id', 'user_id', 'specialization', 'bio', 'base_rate_bdt', 'average_rating'])
+            ->get();
+
+        if ($answers->isEmpty()) {
+            Log::warning('MatchingService: No onboarding answers found.', ['user_id' => $userId]);
+
+            return [
+                'status' => 'unavailable',
+                'generated_at' => now()->toISOString(),
+                'message' => 'No onboarding answers were found for this user.',
+                'matches' => [],
+            ];
         }
 
-        $prompt = <<<'PROMPT'
-You extract mental-health matching keywords from onboarding answers.
-Return ONLY valid JSON with this exact shape:
-{"keywords":["stress","career"],"concerns":["stress"],"specializations":["career coach"]}
+        if ($consultants->isEmpty()) {
+            Log::warning('MatchingService: No approved consultants found.', ['user_id' => $userId]);
 
-Rules:
-- Use only short, broad keywords.
-- Prefer these domains when relevant: depression, anxiety, stress, academic pressure, career, family, relationship, trauma, addiction, self esteem, grief, burnout, mindfulness, confidence, workplace stress, exam anxiety.
-- Return at most 5 keywords.
-- No markdown, no explanation.
-PROMPT;
+            return [
+                'status' => 'unavailable',
+                'generated_at' => now()->toISOString(),
+                'message' => 'No approved consultants are available yet.',
+                'matches' => [],
+            ];
+        }
 
-        $response = Http::timeout(20)->post(
-            sprintf(
-                'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
-                $model,
-                $apiKey
-            ),
+        $patientProfile = $this->buildPatientProfile($answers);
+        $shortlistedConsultants = $this->shortlistConsultants($consultants, $patientProfile);
+        $catalog = $shortlistedConsultants
+            ->take(10)
+            ->map(fn (ConsultantProfile $consultant) => [
+                'id' => $consultant->id,
+                'specialization' => $consultant->specialization,
+                'bio' => $consultant->bio,
+                'average_rating' => (float) $consultant->average_rating,
+                'base_rate_bdt' => (float) $consultant->base_rate_bdt,
+            ])
+            ->values()
+            ->all();
+
+        $response = $this->geminiService->generateJson(
+            $this->buildPrompt($patientProfile, $catalog),
             [
-                'contents' => [[
-                    'role' => 'user',
-                    'parts' => [[
-                        'text' => $prompt . "\n\nAnswers:\n" . $answers->toJson(),
-                    ]],
-                ]],
-                'generationConfig' => [
-                    'temperature' => 0.2,
-                    'responseMimeType' => 'application/json',
-                ],
+                'temperature' => 0.2,
+                'max_output_tokens' => 1400,
+                'system_instruction' => 'You are a mental-health consultation matcher. Return only JSON and never include patient identity.',
             ]
         );
 
-        if ($response->failed()) {
-            Log::error('MatchingService: Gemini keyword extraction failed.', ['body' => $response->body()]);
-            return [];
+        $matches = $this->normalizeGeminiMatches($response, $consultants);
+
+        if ($matches === []) {
+            $matches = $this->fallbackMatches($shortlistedConsultants, $patientProfile);
         }
 
-        $content = data_get($response->json(), 'candidates.0.content.parts.0.text', '');
-        $decoded = json_decode(trim($content), true);
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        $keywords = array_merge(
-            $decoded['keywords'] ?? [],
-            $decoded['concerns'] ?? [],
-            $decoded['specializations'] ?? []
-        );
-
-        return $this->normalizeKeywords($keywords);
+        return [
+            'status' => $matches === [] ? 'unavailable' : 'ready',
+            'generated_at' => now()->toISOString(),
+            'message' => $matches === []
+                ? 'No consultant match could be generated from the current data.'
+                : 'Top consultant matches generated successfully.',
+            'profile_summary' => [
+                'primary_concern' => $patientProfile['primary_concern'],
+                'keywords' => $patientProfile['keywords'],
+                'preferred_style' => $patientProfile['preferred_style'],
+                'duration' => $patientProfile['duration'],
+            ],
+            'matches' => $matches,
+        ];
     }
 
-    private function fallbackKeywords(Collection $answers): array
+    public function getRecommendedConsultants(int $userId): array
     {
-        $text = Str::lower($answers->pluck('answer_text')->implode(' '));
+        return data_get($this->generateRecommendationPayload($userId), 'matches', []);
+    }
 
-        return collect(self::MATCH_KEYWORDS)
-            ->filter(fn (string $keyword) => str_contains($text, Str::lower($keyword)))
+    private function buildPatientProfile(Collection $answers): array
+    {
+        $answersByKey = $answers
+            ->mapWithKeys(fn ($answer) => [$answer->question_key => $answer->answer_text])
+            ->all();
+
+        $haystack = Str::lower(implode(' ', $answersByKey));
+        $keywords = collect(self::MATCH_KEYWORDS)
+            ->filter(fn (string $keyword) => str_contains($haystack, Str::lower($keyword)))
+            ->take(5)
+            ->values()
+            ->all();
+
+        return [
+            'primary_concern' => $answersByKey['primary_concern'] ?? 'General support',
+            'duration' => $answersByKey['duration'] ?? 'Unknown',
+            'preferred_style' => $answersByKey['therapist_style'] ?? 'I am not sure',
+            'daily_functioning' => $answersByKey['daily_functioning'] ?? null,
+            'sleep_impact' => $answersByKey['sleep_impact'] ?? null,
+            'social_life' => $answersByKey['social_life'] ?? null,
+            'physical_symptoms' => $answersByKey['physical_symptoms'] ?? null,
+            'keywords' => $keywords,
+        ];
+    }
+
+    private function shortlistConsultants(Collection $consultants, array $patientProfile): Collection
+    {
+        $keywords = collect($patientProfile['keywords'] ?? []);
+        $styleHints = collect(
+            self::THERAPY_STYLE_HINTS[Str::lower((string) $patientProfile['preferred_style'])] ?? []
+        );
+
+        return $consultants
+            ->map(function (ConsultantProfile $consultant) use ($keywords, $styleHints, $patientProfile) {
+                $haystack = Str::lower(trim($consultant->specialization . ' ' . ($consultant->bio ?? '')));
+
+                $keywordScore = $keywords
+                    ->filter(fn (string $keyword) => str_contains($haystack, Str::lower($keyword)))
+                    ->count();
+
+                $styleScore = $styleHints
+                    ->filter(fn (string $hint) => str_contains($haystack, Str::lower($hint)))
+                    ->count();
+
+                $concernScore = str_contains($haystack, Str::lower((string) $patientProfile['primary_concern']))
+                    ? 2
+                    : 0;
+
+                $consultant->matching_score = $keywordScore + $styleScore + $concernScore;
+
+                return $consultant;
+            })
+            ->sortByDesc('matching_score')
+            ->values();
+    }
+
+    private function buildPrompt(array $patientProfile, array $catalog): string
+    {
+        $consultantCatalog = json_encode($catalog, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $profile = json_encode([
+            'primary_concern' => $patientProfile['primary_concern'],
+            'duration' => $patientProfile['duration'],
+            'preferred_style' => $patientProfile['preferred_style'],
+            'keywords' => $patientProfile['keywords'],
+            'daily_functioning' => $patientProfile['daily_functioning'],
+            'sleep_impact' => $patientProfile['sleep_impact'],
+            'social_life' => $patientProfile['social_life'],
+            'physical_symptoms' => $patientProfile['physical_symptoms'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return <<<PROMPT
+Patient profile:
+{$profile}
+
+Approved consultants:
+{$consultantCatalog}
+
+Task:
+- Pick the top 2 consultant matches for this patient.
+- Use symptoms, duration, therapy preference, and overall fit.
+- Reasons should be meaningful, specific, and reference the consultant's bio or specialization.
+- Never mention names, emails, or anything outside the data above.
+- Keep each reason under 220 characters.
+
+Return ONLY valid JSON with this exact shape:
+{
+  "matches": [
+    {
+      "consultant_id": 1,
+      "reason": "Why this consultant matches the patient."
+    },
+    {
+      "consultant_id": 2,
+      "reason": "Why this consultant matches the patient."
+    }
+  ]
+}
+PROMPT;
+    }
+
+    private function normalizeGeminiMatches(?array $response, Collection $consultants): array
+    {
+        if (!is_array($response) || !isset($response['matches']) || !is_array($response['matches'])) {
+            return [];
+        }
+
+        return collect($response['matches'])
+            ->map(function ($match, int $index) use ($consultants) {
+                $consultantId = (int) data_get($match, 'consultant_id');
+                $consultant = $consultants->firstWhere('id', $consultantId);
+
+                if (!$consultant instanceof ConsultantProfile) {
+                    return null;
+                }
+
+                return [
+                    'consultant_id' => $consultant->id,
+                    'user_id' => $consultant->user_id,
+                    'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
+                    'specialization' => $consultant->specialization,
+                    'reason' => Str::limit((string) data_get($match, 'reason', ''), 220, ''),
+                    'rank' => $index + 1,
+                ];
+            })
+            ->filter()
+            ->unique('consultant_id')
+            ->take(2)
             ->values()
             ->all();
     }
 
-    private function buildShortlist($consultantsQuery, array $keywords)
+    private function fallbackMatches(Collection $consultants, array $patientProfile): array
     {
-        if (empty($keywords)) {
-            return collect();
-        }
+        $keywords = collect($patientProfile['keywords'] ?? []);
+        $styleHints = collect(
+            self::THERAPY_STYLE_HINTS[Str::lower((string) $patientProfile['preferred_style'])] ?? []
+        );
 
-        return $consultantsQuery
-            ->where(function ($query) use ($keywords) {
-                foreach ($keywords as $keyword) {
-                    $query->orWhere('specialization', 'ilike', '%' . $keyword . '%')
-                        ->orWhere('bio', 'ilike', '%' . $keyword . '%');
-                }
-            })
-            ->get();
-    }
-
-    private function rankConsultants(Collection $consultants, array $keywords): Collection
-    {
         return $consultants
-            ->map(function (ConsultantProfile $consultant) use ($keywords) {
-                $haystack = Str::lower($consultant->specialization . ' ' . $consultant->bio);
-
-                $matches = collect($keywords)
+            ->take(10)
+            ->values()
+            ->map(function (ConsultantProfile $consultant, int $index) use ($keywords, $styleHints, $patientProfile) {
+                $haystack = Str::lower(trim($consultant->specialization . ' ' . ($consultant->bio ?? '')));
+                $matchedKeywords = $keywords
                     ->filter(fn (string $keyword) => str_contains($haystack, Str::lower($keyword)))
                     ->values();
 
-                $score = $matches->count();
+                $matchedStyleHints = $styleHints
+                    ->filter(fn (string $hint) => str_contains($haystack, Str::lower($hint)))
+                    ->values();
+
+                $reasonParts = collect([
+                    $matchedKeywords->isNotEmpty() ? 'Aligned with ' . $matchedKeywords->implode(', ') : null,
+                    $matchedStyleHints->isNotEmpty() ? 'supports a ' . $patientProfile['preferred_style'] . ' approach' : null,
+                ])->filter()->values();
 
                 return [
-                    'id' => $consultant->id,
+                    'consultant_id' => $consultant->id,
                     'user_id' => $consultant->user_id,
                     'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                     'specialization' => $consultant->specialization,
-                    'reason' => $matches->isNotEmpty()
-                        ? 'Matches: ' . $matches->implode(', ')
-                        : 'Broad consultant fit based on specialization and bio.',
-                    'score' => $score,
+                    'reason' => $reasonParts->isNotEmpty()
+                        ? Str::finish($reasonParts->implode(' and '), '.')
+                        : 'Broad fit based on approved specialization and bio.',
+                    'rank' => $index + 1,
                 ];
             })
-            ->sortByDesc('score')
-            ->values();
-    }
-
-    private function normalizeKeywords(array $keywords): array
-    {
-        return collect($keywords)
-            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
-            ->map(fn (string $value) => Str::lower(trim($value)))
-            ->unique()
-            ->take(5)
+            ->take(2)
             ->values()
             ->all();
     }

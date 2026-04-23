@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AiRecommendation;
 use App\Models\MoodJournal;
-use App\Services\GeminiService;
+use App\Services\ExerciseService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,39 +17,35 @@ class GenerateMentalExercises implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $timeout = 120;
 
-    public function __construct(protected MoodJournal $journal) {}
-
-    public function handle(GeminiService $gemini): void
+    public function __construct(public readonly int $journalId)
     {
-        try {
-            $systemPrompt = "You are a professional AI Therapist. Based on the user's mood and journal note, generate a 3-chapter mental exercise guide.";
-            
-            $userPrompt = "Mood: {$this->journal->emoji_mood}. Note: '{$this->journal->text_note}'. 
-            Provide exactly 3 chapters: 
-            Chapter 1: Immediate Grounding (Short term), 
-            Chapter 2: Deep Reflection (Emotional work), 
-            Chapter 3: Actionable Step (Task for today).
-            Return ONLY a raw JSON array of objects with keys 'chapter_title', 'content', and 'estimated_time'.";
+        $this->onQueue('default');
+    }
 
-            $result = $gemini->generate($systemPrompt, $userPrompt);
+    public function handle(ExerciseService $exerciseService): void
+    {
+        $journal = MoodJournal::find($this->journalId);
 
-            if (!empty($result)) {
-                AiRecommendation::updateOrCreate(
-                    [
-                        'user_id' => $this->journal->user_id,
-                        'rec_type' => 'exercise',
-                    ],
-                    [
-                        'source_journal_id' => $this->journal->id,
-                        'content_json' => $result,
-                    ]
-                );
-            }
-        } catch (\Throwable $e) {
-            Log::error('GenerateMentalExercises failed: ' . $e->getMessage());
-            throw $e;
+        if (!$journal instanceof MoodJournal) {
+            Log::warning('GenerateMentalExercises: Journal not found.', ['journal_id' => $this->journalId]);
+
+            return;
         }
+
+        $exercisePlan = $exerciseService->generateForJournal($journal);
+
+        AiRecommendation::updateOrCreate(
+            [
+                'user_id' => $journal->user_id,
+                'source_journal_id' => $journal->id,
+                'rec_type' => 'exercise',
+            ],
+            [
+                'content_json' => $exercisePlan,
+            ]
+        );
     }
 }

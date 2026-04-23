@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateConsultantRecommendations;
+use App\Jobs\GenerateOnboardingExercises;
 use App\Models\OnboardingAnswer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,8 +38,14 @@ class OnboardingController extends Controller
             $user->save();
 
             GenerateConsultantRecommendations::dispatch($user->id);
+            GenerateOnboardingExercises::dispatch($user->id);
 
-            return response()->json(['message' => 'Onboarding successful', 'redirect' => '/dashboard']);
+            return response()->json([
+                'message' => 'Onboarding successful',
+                'redirect' => '/dashboard',
+                'recommendation_status' => 'queued',
+                'exercise_status' => 'queued',
+            ]);
         } catch (\Throwable $e) {
             Log::error('Critical Onboarding Error: ' . $e->getMessage());
 
