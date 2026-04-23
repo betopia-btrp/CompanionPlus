@@ -126,7 +126,7 @@ export default function JournalPage() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await api.get("/journal");
+      const res = await api.get("/api/journal");
       setDashboard(res.data);
     } catch (error) {
       console.error("Error fetching journal", error);
@@ -139,7 +139,7 @@ export default function JournalPage() {
     let ignore = false;
 
     api
-      .get("/journal")
+      .get("/api/journal")
       .then((res) => {
         if (!ignore) {
           setDashboard(res.data);
@@ -164,7 +164,7 @@ export default function JournalPage() {
     setStatusMessage(null);
 
     try {
-      await api.post("/journal", {
+      await api.post("/api/journal", {
         emoji_mood: selectedMood.value,
         text_note: newNote,
       });
@@ -190,7 +190,7 @@ export default function JournalPage() {
     }
 
     try {
-      await api.delete(`/journal/${id}`);
+      await api.delete(`/api/journal/${id}`);
       setStatusMessage("Journal entry deleted.");
       await fetchDashboard();
     } catch (error) {

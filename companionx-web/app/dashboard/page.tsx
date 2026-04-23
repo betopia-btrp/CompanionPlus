@@ -5,6 +5,7 @@ import { BookOpen, Calendar, LayoutDashboard, PlayCircle, Star } from "lucide-re
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
+import { fetchCurrentUser } from "@/lib/auth";
 
 type RecommendedConsultant = {
   id: number;
@@ -46,23 +47,28 @@ export default function Dashboard() {
   useEffect(() => {
     let ignore = false;
 
-    api
-      .get("/user")
-      .then((res) => {
+    fetchCurrentUser()
+      .then((currentUser) => {
         if (ignore) {
           return;
         }
 
-        setUser(res.data);
+        setUser(currentUser);
         setAuthChecked(true);
 
-        if (res.data?.system_role === "consultant") {
+        if (!currentUser) {
+          setLoadingRecommendations(false);
+          router.push("/login");
+          return;
+        }
+
+        if (currentUser.system_role === "consultant") {
           setLoadingRecommendations(false);
           return;
         }
 
         api
-          .get("/dashboard/recommendations")
+          .get("/api/dashboard/recommendations")
           .then((recommendationRes) => {
             if (!ignore) {
               setRecommendationData(recommendationRes.data);

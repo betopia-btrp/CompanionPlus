@@ -58,7 +58,7 @@ export default function ConsultantDashboardPage() {
 
   const loadDashboard = async () => {
     try {
-      const res = await api.get("/consultant/dashboard");
+      const res = await api.get("/api/consultant/dashboard");
       setData(res.data);
       setProfileForm({
         specialization: res.data.consultant.specialization ?? "",
@@ -76,7 +76,7 @@ export default function ConsultantDashboardPage() {
     let ignore = false;
 
     api
-      .get("/consultant/dashboard")
+      .get("/api/consultant/dashboard")
       .then((res) => {
         if (!ignore) {
           setData(res.data);
@@ -114,7 +114,7 @@ export default function ConsultantDashboardPage() {
     setStatusMessage(null);
 
     try {
-      await api.patch("/consultant/profile", {
+      await api.patch("/api/consultant/profile", {
         specialization: profileForm.specialization,
         bio: profileForm.bio || null,
         base_rate_bdt: Number(profileForm.base_rate_bdt),
@@ -134,7 +134,7 @@ export default function ConsultantDashboardPage() {
     setStatusMessage(null);
 
     try {
-      await api.post("/consultant/slots", slotForm);
+      await api.post("/api/consultant/slots", slotForm);
       setSlotForm({ start_datetime: "", end_datetime: "" });
       setStatusMessage("Availability slot created.");
       await loadDashboard();
@@ -148,7 +148,7 @@ export default function ConsultantDashboardPage() {
 
   const handleDeleteSlot = async (slotId: number) => {
     try {
-      await api.delete(`/consultant/slots/${slotId}`);
+      await api.delete(`/api/consultant/slots/${slotId}`);
       setStatusMessage("Availability slot removed.");
       await loadDashboard();
     } catch (error: unknown) {

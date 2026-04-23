@@ -130,7 +130,7 @@ export default function ExercisesPage() {
 
   useEffect(() => {
     api
-      .get("/dashboard/exercises")
+      .get("/api/dashboard/exercises")
       .then((res) => {
         setData(res.data);
         setReviewFeeling(res.data?.progress?.review?.feeling ?? "");
@@ -177,7 +177,7 @@ export default function ExercisesPage() {
     setStatusMessage(null);
 
     try {
-      const res = await api.patch("/dashboard/exercises/progress", {
+      const res = await api.patch("/api/dashboard/exercises/progress", {
         recommendation_id: data.recommendation_id,
         completed_task_keys: Array.from(nextTaskKeys),
       });
@@ -219,7 +219,7 @@ export default function ExercisesPage() {
     setStatusMessage(null);
 
     try {
-      const res = await api.patch("/dashboard/exercises/progress", {
+      const res = await api.patch("/api/dashboard/exercises/progress", {
         recommendation_id: data.recommendation_id,
         review_feeling: reviewFeeling || null,
         review_text: reviewText || null,

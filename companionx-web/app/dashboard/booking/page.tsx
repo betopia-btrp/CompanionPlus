@@ -91,7 +91,7 @@ export default function BookingPage() {
     }
 
     try {
-      const res = await api.get("/consultants", { params: filters });
+      const res = await api.get("/api/consultants", { params: filters });
       setData(res.data);
     } catch (error) {
       console.error("Error fetching booking data", error);
@@ -106,7 +106,7 @@ export default function BookingPage() {
     let ignore = false;
 
     api
-      .get("/consultants", { params: filters })
+      .get("/api/consultants", { params: filters })
       .then((res) => {
         if (!ignore) {
           setData(res.data);
@@ -163,7 +163,7 @@ export default function BookingPage() {
     setStatusMessage(null);
 
     try {
-      await api.post("/booking/hold", { slot_id: slotId });
+      await api.post("/api/booking/hold", { slot_id: slotId });
       setStatusMessage(
         "Slot held for 15 minutes. Payment comes next in the workflow.",
       );
@@ -181,7 +181,7 @@ export default function BookingPage() {
     setStatusMessage(null);
 
     try {
-      await api.delete(`/booking/hold/${slotId}`);
+      await api.delete(`/api/booking/hold/${slotId}`);
       setStatusMessage("Slot hold released.");
       await fetchData({ silent: true });
     } catch (error) {
