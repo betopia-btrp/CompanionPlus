@@ -48,7 +48,7 @@ class MatchingService
 
         $consultants = ConsultantProfile::where('is_approved', true)
             ->with('user:id,first_name,last_name,gender')
-            ->select(['id', 'user_id', 'specialization', 'bio', 'base_rate_bdt', 'average_rating'])
+            ->select(['user_id', 'specialization', 'bio', 'base_rate_bdt', 'average_rating'])
             ->get();
 
         if ($answers->isEmpty()) {
@@ -232,7 +232,7 @@ PROMPT;
         return collect($response['matches'])
             ->map(function ($match, int $index) use ($consultants) {
                 $consultantId = (int) data_get($match, 'consultant_id');
-                $consultant = $consultants->firstWhere('id', $consultantId);
+                $consultant = $consultants->firstWhere('user_id', $consultantId);
 
                 if (!$consultant instanceof ConsultantProfile) {
                     return null;
