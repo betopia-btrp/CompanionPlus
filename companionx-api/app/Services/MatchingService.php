@@ -78,7 +78,7 @@ class MatchingService
         $catalog = $shortlistedConsultants
             ->take(10)
             ->map(fn (ConsultantProfile $consultant) => [
-                'id' => $consultant->id,
+                'id' => $consultant->user_id,
                 'specialization' => $consultant->specialization,
                 'bio' => $consultant->bio,
                 'average_rating' => (float) $consultant->average_rating,
@@ -239,7 +239,7 @@ PROMPT;
                 }
 
                 return [
-                    'consultant_id' => $consultant->id,
+                    'consultant_id' => $consultant->user_id,
                     'user_id' => $consultant->user_id,
                     'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                     'specialization' => $consultant->specialization,
@@ -280,7 +280,7 @@ PROMPT;
                 ])->filter()->values();
 
                 return [
-                    'consultant_id' => $consultant->id,
+                    'consultant_id' => $consultant->user_id,
                     'user_id' => $consultant->user_id,
                     'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                     'specialization' => $consultant->specialization,

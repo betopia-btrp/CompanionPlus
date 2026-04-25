@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsultantProfile;
-use App\Services\SlotHoldService;
+use App\Services\BookingService;
 use Illuminate\Http\Request;
 
 class BookingFlowController extends Controller
 {
-    public function slots(Request $request, int $consultantId, SlotHoldService $slotHoldService)
+    public function slots(Request $request, int $consultantId, BookingService $bookingService)
     {
         $consultant = ConsultantProfile::where('id', $consultantId)
             ->where('is_approved', true)
@@ -18,38 +18,38 @@ class BookingFlowController extends Controller
 
         return response()->json([
             'consultant' => [
-                'id' => $consultant->id,
+                'id' => $consultant->user_id,
                 'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                 'specialization' => $consultant->specialization,
             ],
-            'slots' => $slotHoldService->listConsultantSlots($consultant, $request->user()),
+            'slots' => $bookingService->listConsultantSlots($consultant, $request->user()),
         ]);
     }
 
-    public function currentHold(Request $request, SlotHoldService $slotHoldService)
+    public function currentHold(Request $request, BookingService $bookingService)
     {
         return response()->json([
-            'hold' => $slotHoldService->buildCurrentHoldPayload($request->user()),
+            'hold' => $bookingService->buildActiveBookingPayload($request->user()),
         ]);
     }
 
-    public function hold(Request $request, SlotHoldService $slotHoldService)
+    public function hold(Request $request, BookingService $bookingService)
     {
         $validated = $request->validate([
             'slot_id' => 'required|integer|exists:availability_slots,id',
         ]);
 
         return response()->json(
-            $slotHoldService->holdSlot($request->user(), (int) $validated['slot_id'])
+            $bookingService->bookSlot($request->user(), (int) $validated['slot_id'])
         );
     }
 
-    public function release(Request $request, int $slotId, SlotHoldService $slotHoldService)
+    public function release(Request $request, int $slotId, BookingService $bookingService)
     {
-        $slotHoldService->releaseHold($request->user(), $slotId);
+        $bookingService->cancelBooking($request->user(), $slotId);
 
         return response()->json([
-            'message' => 'Slot hold released.',
+            'message' => 'Booking cancelled.',
         ]);
     }
 }

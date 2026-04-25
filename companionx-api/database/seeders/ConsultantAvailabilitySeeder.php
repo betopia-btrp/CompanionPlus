@@ -45,8 +45,8 @@ class ConsultantAvailabilitySeeder extends Seeder
         ]);
 
         ConsultantProfile::where('is_approved', true)
-            ->where('id', '!=', $demoProfile->id)
-            ->orderBy('id')
+            ->where('user_id', '!=', $demoProfile->user_id)
+            ->orderBy('user_id')
             ->take(3)
             ->get()
             ->each(function (ConsultantProfile $profile, int $index) {
@@ -65,15 +65,11 @@ class ConsultantAvailabilitySeeder extends Seeder
 
             AvailabilitySlot::updateOrCreate(
                 [
-                    'consultant_id' => $profile->id,
+                    'consultant_id' => $profile->user_id,
                     'start_datetime' => $start,
                 ],
                 [
                     'end_datetime' => $end,
-                    'is_booked' => false,
-                    'held_by_user_id' => null,
-                    'hold_expires_at' => null,
-                    'version' => 0,
                 ]
             );
         }

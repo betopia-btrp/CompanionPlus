@@ -27,7 +27,6 @@ type Slot = {
   id: number;
   start_datetime: string;
   end_datetime: string;
-  is_booked: boolean;
   status: "available" | "held" | "held_by_you" | "booked";
   hold_expires_at?: string | null;
   remaining_seconds?: number | null;

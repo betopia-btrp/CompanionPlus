@@ -78,6 +78,10 @@ Route::middleware("auth:sanctum")->group(function () {
             ConsultantDashboardController::class,
             "storeSlot",
         ]);
+        Route::patch("/consultant/slots/{slotId}", [
+            ConsultantDashboardController::class,
+            "updateSlot",
+        ]);
         Route::delete("/consultant/slots/{slotId}", [
             ConsultantDashboardController::class,
             "destroySlot",
@@ -89,6 +93,32 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post("/consultant/bookings/{bookingId}/reject", [
             ConsultantDashboardController::class,
             "rejectBooking",
+        ]);
+
+        // Schedule & Templates
+        Route::get("/consultant/schedule", [
+            ConsultantDashboardController::class,
+            "schedule",
+        ]);
+        Route::post("/consultant/templates", [
+            ConsultantDashboardController::class,
+            "storeTemplate",
+        ]);
+        Route::delete("/consultant/templates/{templateId}", [
+            ConsultantDashboardController::class,
+            "destroyTemplate",
+        ]);
+
+        // Bookings list
+        Route::get("/consultant/bookings", [
+            ConsultantDashboardController::class,
+            "bookings",
+        ]);
+
+        // Wallet / Earnings
+        Route::get("/consultant/wallet", [
+            ConsultantDashboardController::class,
+            "wallet",
         ]);
     });
 });

@@ -5,15 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiRecommendation;
 use App\Models\ConsultantProfile;
-use App\Services\SlotHoldService;
+use App\Services\BookingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class ConsultantController extends Controller
 {
-    public function index(Request $request, SlotHoldService $slotHoldService)
+    public function index(Request $request, BookingService $bookingService)
     {
-        $slotHoldService->releaseExpiredHolds();
+        $bookingService->cancelExpiredBookings();
 
         $consultantsQuery = ConsultantProfile::query()
             ->where('is_approved', true)
@@ -34,7 +34,7 @@ class ConsultantController extends Controller
 
         $consultants = $consultantsQuery
             ->orderBy('average_rating', 'desc')
-            ->orderBy('id')
+            ->orderBy('user_id')
             ->get();
 
         $latestConsultantMatch = AiRecommendation::where('user_id', $request->user()->id)
@@ -50,15 +50,15 @@ class ConsultantController extends Controller
         $storedMatchPayload = $latestConsultantMatch?->content_json ?? [];
 
         return response()->json([
-            'consultants' => $consultants->map(function (ConsultantProfile $consultant) use ($slotHoldService, $request) {
+            'consultants' => $consultants->map(function (ConsultantProfile $consultant) use ($bookingService, $request) {
                 $consultant->slot_summary = [
                     'available_count' => $consultant->availabilitySlots
-                        ->filter(fn ($slot) => $slotHoldService->serializeSlot($slot, $request->user())['status'] === 'available')
+                        ->filter(fn ($slot) => $bookingService->serializeSlot($slot, $request->user())['status'] === 'available')
                         ->count(),
                     'next_available_slot' => optional($consultant->availabilitySlots->first())->start_datetime?->toISOString(),
                 ];
                 $consultant->slots = $consultant->availabilitySlots
-                    ->map(fn ($slot) => $slotHoldService->serializeSlot($slot, $request->user()))
+                    ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
                     ->values();
 
                 return $consultant;
@@ -69,19 +69,19 @@ class ConsultantController extends Controller
                 'profile_summary' => data_get($storedMatchPayload, 'profile_summary'),
                 'recommended_consultants' => $this->buildMatchedConsultants(
                     collect($this->normalizeStoredMatches($storedMatchPayload)),
-                    $slotHoldService,
+                    $bookingService,
                     $request
                 ),
                 'chapters' => data_get($latestExercise?->content_json, 'chapters', []),
                 'exercise' => $latestExercise?->content_json,
             ],
-            'current_hold' => $slotHoldService->buildCurrentHoldPayload($request->user()),
+            'current_hold' => $bookingService->buildActiveBookingPayload($request->user()),
         ]);
     }
 
-    private function buildMatchedConsultants(Collection $recData, SlotHoldService $slotHoldService, Request $request): Collection
+    private function buildMatchedConsultants(Collection $recData, BookingService $bookingService, Request $request): Collection
     {
-        $consultants = ConsultantProfile::whereIn('id', $recData->pluck('consultant_id')->filter())
+        $consultants = ConsultantProfile::whereIn('user_id', $recData->pluck('consultant_id')->filter())
             ->with([
                 'user:id,first_name,last_name,gender',
                 'availabilitySlots' => fn ($query) => $query
@@ -89,10 +89,10 @@ class ConsultantController extends Controller
                     ->orderBy('start_datetime'),
             ])
             ->get()
-            ->keyBy('id');
+            ->keyBy('user_id');
 
         return $recData
-            ->map(function (array $match) use ($consultants, $slotHoldService, $request) {
+            ->map(function (array $match) use ($consultants, $bookingService, $request) {
                 $consultant = $consultants->get((int) ($match['consultant_id'] ?? 0));
 
                 if (!$consultant instanceof ConsultantProfile) {
@@ -103,12 +103,12 @@ class ConsultantController extends Controller
                 $consultant->match_rank = (int) data_get($match, 'rank', 0);
                 $consultant->slot_summary = [
                     'available_count' => $consultant->availabilitySlots
-                        ->filter(fn ($slot) => $slotHoldService->serializeSlot($slot, $request->user())['status'] === 'available')
+                        ->filter(fn ($slot) => $bookingService->serializeSlot($slot, $request->user())['status'] === 'available')
                         ->count(),
                     'next_available_slot' => optional($consultant->availabilitySlots->first())->start_datetime?->toISOString(),
                 ];
                 $consultant->slots = $consultant->availabilitySlots
-                    ->map(fn ($slot) => $slotHoldService->serializeSlot($slot, $request->user()))
+                    ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
                     ->values();
 
                 return $consultant;

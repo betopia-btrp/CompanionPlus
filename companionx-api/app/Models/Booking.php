@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 class Booking extends Model
 {
@@ -31,7 +32,7 @@ class Booking extends Model
 
     public function consultant(): BelongsTo
     {
-        return $this->belongsTo(ConsultantProfile::class, 'consultant_id');
+        return $this->belongsTo(ConsultantProfile::class, 'consultant_id', 'user_id');
     }
 
     public function patient(): BelongsTo
@@ -42,5 +43,31 @@ class Booking extends Model
     public function slot(): BelongsTo
     {
         return $this->belongsTo(AvailabilitySlot::class, 'slot_id');
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    private const HOLD_MINUTES = 15;
+
+    public function hasActiveHold(): bool
+    {
+        return $this->status === 'booked'
+            && $this->created_at instanceof Carbon
+            && $this->created_at->addMinutes(self::HOLD_MINUTES)->isFuture();
+    }
+
+    public function holdExpiresAt(): Carbon
+    {
+        return $this->created_at->copy()->addMinutes(self::HOLD_MINUTES);
+    }
+
+    public function isHeldBy(?User $user): bool
+    {
+        return $this->hasActiveHold()
+            && $user !== null
+            && $this->patient_id === $user->id;
     }
 }
