@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import api from "@/lib/axios";
+import { ensureCsrfCookie } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -145,6 +146,7 @@ export default function OnboardingPage() {
 
   const submitOnboarding = async () => {
     try {
+      await ensureCsrfCookie();
       await api.post("/api/onboarding", { answers });
       alert("Onboarding complete! Generating your recommendations...");
       router.push("/dashboard");
