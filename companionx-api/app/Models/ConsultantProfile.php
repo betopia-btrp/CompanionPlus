@@ -9,14 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ConsultantProfile extends Model
 {
     protected $table = 'consultant_profiles';
+    protected $primaryKey = 'user_id';
+    public $incrementing = false;
+    protected $keyType = 'int';
 
     protected $fillable = [
-        'user_id', 
-        'specialization', 
-        'bio', 
-        'base_rate_bdt', 
-        'is_approved', 
-        'average_rating'
+        'user_id',
+        'specialization',
+        'bio',
+        'base_rate_bdt',
+        'is_approved',
+        'average_rating',
+        'balance_bdt',
     ];
 
     protected function casts(): array
@@ -25,6 +29,7 @@ class ConsultantProfile extends Model
             'base_rate_bdt' => 'float',
             'is_approved' => 'boolean',
             'average_rating' => 'float',
+            'balance_bdt' => 'float',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -43,5 +48,10 @@ class ConsultantProfile extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class, 'consultant_id');
+    }
+
+    public function availabilityTemplates(): HasMany
+    {
+        return $this->hasMany(AvailabilityTemplate::class, 'consultant_id');
     }
 }

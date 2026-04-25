@@ -1,0 +1,299 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import api from "@/lib/axios";
+import { useRouter } from "next/navigation";
+import {
+  VideoCamera,
+  Check,
+  X,
+  ArrowRight,
+} from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+
+type Booking = {
+  id: number;
+  patient_ref: string;
+  patient_name: string;
+  status: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  price_at_booking: number;
+  jitsi_room_uuid: string;
+  is_first_time: boolean;
+};
+
+type Meta = {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+};
+
+const TABS = [
+  { key: "pending", label: "Pending" },
+  { key: "confirmed", label: "Upcoming" },
+  { key: "completed", label: "Past" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case "pending":
+      return "border-amber-500/40 text-amber-700 bg-amber-500/10";
+    case "confirmed":
+      return "border-emerald-500/40 text-emerald-700 bg-emerald-500/10";
+    case "completed":
+      return "border-primary/40 text-primary bg-primary/10";
+    case "cancelled":
+      return "border-border text-muted-foreground bg-muted/30";
+    case "booked":
+      return "border-primary/40 text-primary bg-primary/10";
+    default:
+      return "border-border text-muted-foreground bg-muted/30";
+  }
+}
+
+export default function BookingsPage() {
+  const [activeTab, setActiveTab] = useState("pending");
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const router = useRouter();
+
+  const fetchBookings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/api/consultant/bookings", {
+        params: { status: activeTab, page },
+      });
+      setBookings(res.data.bookings);
+      setMeta(res.data.meta);
+    } catch (error) {
+      console.error("Failed to load bookings", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, page]);
+
+  useEffect(() => {
+    setPage(1);
+    fetchBookings();
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [page]);
+
+  const handleApprove = async (bookingId: number) => {
+    setActionLoading(bookingId);
+    try {
+      await api.post(`/api/consultant/bookings/${bookingId}/approve`);
+      await fetchBookings();
+    } catch (error) {
+      console.error("Failed to approve booking", error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (bookingId: number) => {
+    setActionLoading(bookingId);
+    try {
+      await api.post(`/api/consultant/bookings/${bookingId}/reject`);
+      await fetchBookings();
+    } catch (error) {
+      console.error("Failed to reject booking", error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+        {/* ── Header ──────────────────────────────────────────────── */}
+        <header className="mb-8">
+          <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
+            Consultant
+          </p>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            Bookings
+          </h1>
+        </header>
+
+        {/* ── Tabs ────────────────────────────────────────────────── */}
+        <div className="mb-6 flex items-center gap-1 border border-border bg-card p-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 px-4 py-2.5 font-sans text-xs font-medium transition-colors ${
+                activeTab === tab.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Bookings List ───────────────────────────────────────── */}
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 animate-pulse border border-border bg-muted" />
+            ))}
+          </div>
+        ) : bookings.length === 0 ? (
+          <div className="border border-border bg-card p-10 text-center">
+            <p className="font-heading text-sm font-medium text-foreground">
+              No {activeTab} bookings
+            </p>
+            <p className="mt-1 font-sans text-xs text-muted-foreground">
+              {activeTab === "pending"
+                ? "New session requests will appear here."
+                : activeTab === "confirmed"
+                  ? "Upcoming confirmed sessions will appear here."
+                  : "Past sessions will appear here."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {bookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="border border-border bg-card px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex items-center gap-5">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-sans text-sm font-medium text-foreground">
+                        {booking.patient_ref}
+                      </span>
+                      <span
+                        className={`font-sans text-[10px] font-medium uppercase tracking-wider border px-2 py-0.5 ${getStatusStyle(booking.status)}`}
+                      >
+                        {booking.status}
+                      </span>
+                      {booking.is_first_time && (
+                        <span className="font-sans text-[10px] text-muted-foreground">
+                          First-time
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-sans text-xs text-muted-foreground">
+                      {formatDate(booking.scheduled_start)},{" "}
+                      {formatTime(booking.scheduled_start)} –{" "}
+                      {formatTime(booking.scheduled_end)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {booking.status === "pending" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs font-medium"
+                        onClick={() => handleReject(booking.id)}
+                        disabled={actionLoading === booking.id}
+                      >
+                        <X size={14} weight="bold" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="text-xs font-medium"
+                        onClick={() => handleApprove(booking.id)}
+                        disabled={actionLoading === booking.id}
+                      >
+                        <Check size={14} weight="bold" />
+                        Approve
+                      </Button>
+                    </>
+                  )}
+                  {booking.status === "confirmed" && (
+                    <Button
+                      size="sm"
+                      className="text-xs font-medium"
+                      onClick={() =>
+                        router.push(`/dashboard/room?room=${booking.jitsi_room_uuid}`)
+                      }
+                    >
+                      <VideoCamera size={14} weight="bold" />
+                      Join Session
+                    </Button>
+                  )}
+                  {booking.status === "completed" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-medium"
+                    >
+                      View Notes
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Pagination ──────────────────────────────────────────── */}
+        {meta && meta.last_page > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ArrowRight size={14} className="rotate-180" />
+            </Button>
+            <span className="font-sans text-xs text-muted-foreground">
+              Page {meta.current_page} of {meta.last_page}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= meta.last_page}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ArrowRight size={14} />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

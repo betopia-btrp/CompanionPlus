@@ -12,6 +12,7 @@ import {
   SignOut,
   Gear,
   Sparkle,
+  Wallet,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -38,7 +39,9 @@ const patientNav = [
 
 const consultantNav = [
   { title: "Dashboard", href: "/dashboard", icon: House },
-  { title: "Profile & Slots", href: "/dashboard/consultant", icon: Gear },
+  { title: "Schedule", href: "/dashboard/schedule", icon: CalendarBlank },
+  { title: "Bookings", href: "/dashboard/bookings", icon: BookOpen },
+  { title: "Earnings", href: "/dashboard/earnings", icon: Wallet },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
 

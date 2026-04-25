@@ -154,7 +154,6 @@ export default function OnboardingPage() {
   };
   const selectAnswer = (value: string) => {
     setAnswers((prev) => ({ ...prev, [q.key]: value }));
-    handleNext();
   };
 
   const updateRangeAnswer = (value: number) => {

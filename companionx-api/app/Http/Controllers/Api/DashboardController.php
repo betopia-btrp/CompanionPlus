@@ -279,10 +279,10 @@ class DashboardController extends Controller
 
     private function buildMatchedConsultantPayload(Collection $recData): Collection
     {
-        $consultants = ConsultantProfile::whereIn('id', $recData->pluck('consultant_id')->filter())
+        $consultants = ConsultantProfile::whereIn('user_id', $recData->pluck('consultant_id')->filter())
             ->with('user:id,first_name,last_name,gender')
             ->get()
-            ->keyBy('id');
+            ->keyBy('user_id');
 
         return $recData
             ->map(function (array $match) use ($consultants) {
