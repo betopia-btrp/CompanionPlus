@@ -238,6 +238,9 @@ export default function RegisterPage() {
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
+                      captionLayout="dropdown"
+                      fromYear={1950}
+                      toYear={new Date().getFullYear()}
                       selected={date}
                       onSelect={(selected) => {
                         setDate(selected);

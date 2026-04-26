@@ -10,11 +10,13 @@ class SubscriptionPlan extends Model
 {
     protected $fillable = [
         'name',
+        'type',
         'price',
         'billing_interval',
         'features',
         'is_active',
         'sort_order',
+        'stripe_price_id',
     ];
 
     protected function casts(): array
@@ -33,13 +35,7 @@ class SubscriptionPlan extends Model
 
     public function subscriptions(): HasMany
     {
-        return $this->hasMany(UserSubscription::class);
-    }
-
-    public function activeSubscription(): HasOne
-    {
-        return $this->hasOne(UserSubscription::class)
-            ->where('status', 'active');
+        return $this->hasMany(Subscription::class);
     }
 
     public function getFeature(string $key, mixed $default = null): mixed

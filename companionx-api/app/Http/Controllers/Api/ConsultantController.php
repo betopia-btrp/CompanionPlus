@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateConsultantRecommendations;
+use App\Jobs\GenerateOnboardingExercises;
 use App\Models\AiRecommendation;
 use App\Models\ConsultantProfile;
 use App\Services\BookingService;
@@ -37,17 +39,19 @@ class ConsultantController extends Controller
             ->orderBy('user_id')
             ->get();
 
-        $latestConsultantMatch = AiRecommendation::where('user_id', $request->user()->id)
-            ->where('rec_type', 'consultant_match')
-            ->latest()
-            ->first();
+        $user = $request->user();
+        $canAccessAi = $user->canAccessAiRecommendations();
 
-        $latestExercise = AiRecommendation::where('user_id', $request->user()->id)
-            ->where('rec_type', 'exercise')
-            ->latest()
-            ->first();
-
-        $storedMatchPayload = $latestConsultantMatch?->content_json ?? [];
+        $aiData = $canAccessAi
+            ? $this->buildAiData($user)
+            : [
+                'recommendation_status' => 'premium_required',
+                'generated_at' => null,
+                'profile_summary' => null,
+                'recommended_consultants' => [],
+                'chapters' => [],
+                'exercise' => null,
+            ];
 
         return response()->json([
             'consultants' => $consultants->map(function (ConsultantProfile $consultant) use ($bookingService, $request) {
@@ -63,20 +67,90 @@ class ConsultantController extends Controller
 
                 return $consultant;
             })->values(),
-            'ai_data' => [
-                'recommendation_status' => $this->resolveRecommendationStatus($request, $storedMatchPayload),
-                'generated_at' => data_get($storedMatchPayload, 'generated_at'),
-                'profile_summary' => data_get($storedMatchPayload, 'profile_summary'),
-                'recommended_consultants' => $this->buildMatchedConsultants(
-                    collect($this->normalizeStoredMatches($storedMatchPayload)),
-                    $bookingService,
-                    $request
-                ),
-                'chapters' => data_get($latestExercise?->content_json, 'chapters', []),
-                'exercise' => $latestExercise?->content_json,
-            ],
-            'current_hold' => $bookingService->buildActiveBookingPayload($request->user()),
+            'ai_data' => $aiData,
+            'current_hold' => $bookingService->buildActiveBookingPayload($user),
         ]);
+    }
+
+    public function show(Request $request, string $consultantId, BookingService $bookingService)
+    {
+        $bookingService->cancelExpiredBookings();
+
+        $consultant = ConsultantProfile::where('user_id', (int) $consultantId)
+            ->where('is_approved', true)
+            ->with([
+                'user:id,first_name,last_name,gender',
+                'availabilitySlots' => fn ($query) => $query
+                    ->where('start_datetime', '>', now())
+                    ->orderBy('start_datetime'),
+            ])
+            ->firstOrFail();
+
+        $slots = $consultant->availabilitySlots
+            ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
+            ->filter(fn ($s) => $s['status'] === 'available')
+            ->values();
+
+        return response()->json([
+            'consultant' => [
+                'id' => $consultant->user_id,
+                'specialization' => $consultant->specialization,
+                'bio' => $consultant->bio,
+                'average_rating' => (float) $consultant->average_rating,
+                'base_rate_bdt' => (float) $consultant->base_rate_bdt,
+                'user' => [
+                    'first_name' => $consultant->user->first_name,
+                    'last_name' => $consultant->user->last_name,
+                    'gender' => $consultant->user->gender,
+                ],
+            ],
+            'slots' => $slots,
+        ]);
+    }
+
+    private function buildAiData($user): array
+    {
+        $latestConsultantMatch = AiRecommendation::where('user_id', $user->id)
+            ->where('rec_type', 'consultant_match')
+            ->latest()
+            ->first();
+
+        $latestExercise = AiRecommendation::where('user_id', $user->id)
+            ->where('rec_type', 'exercise')
+            ->latest()
+            ->first();
+
+        if ($user->onboarding_completed && !$latestConsultantMatch && !$latestExercise) {
+            $pending = AiRecommendation::where('user_id', $user->id)
+                ->where('rec_type', 'generation_pending')
+                ->where('created_at', '>', now()->subMinutes(5))
+                ->exists();
+
+            if (!$pending) {
+                AiRecommendation::updateOrCreate(
+                    ['user_id' => $user->id, 'rec_type' => 'generation_pending'],
+                    ['content_json' => '[]']
+                );
+
+                GenerateConsultantRecommendations::dispatch($user->id);
+                GenerateOnboardingExercises::dispatch($user->id);
+            }
+        }
+
+        $storedMatchPayload = $latestConsultantMatch?->content_json ?? [];
+
+        return [
+            'recommendation_status' => $this->resolveRecommendationStatus($user, $storedMatchPayload),
+            'generated_at' => data_get($storedMatchPayload, 'generated_at'),
+            'profile_summary' => data_get($storedMatchPayload, 'profile_summary'),
+            'recommended_consultants' => $this->buildMatchedConsultants(
+                collect($this->normalizeStoredMatches($storedMatchPayload)),
+                app(BookingService::class),
+                request()
+            ),
+            'chapters' => data_get($latestExercise?->content_json, 'chapters', []),
+            'exercise' => $latestExercise?->content_json,
+        ];
     }
 
     private function buildMatchedConsultants(Collection $recData, BookingService $bookingService, Request $request): Collection
@@ -126,12 +200,12 @@ class ConsultantController extends Controller
         return data_get($payload, 'matches', []);
     }
 
-    private function resolveRecommendationStatus(Request $request, array $payload): string
+    private function resolveRecommendationStatus($user, array $payload): string
     {
         if ($payload !== []) {
             return data_get($payload, 'status', 'ready');
         }
 
-        return $request->user()->onboarding_completed ? 'pending' : 'missing_onboarding';
+        return $user->onboarding_completed ? 'pending' : 'missing_onboarding';
     }
 }

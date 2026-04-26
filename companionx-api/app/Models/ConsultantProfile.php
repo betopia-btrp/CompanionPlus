@@ -13,6 +13,13 @@ class ConsultantProfile extends Model
     public $incrementing = false;
     protected $keyType = 'int';
 
+    protected $appends = ['id'];
+
+    public function getIdAttribute(): int
+    {
+        return $this->user_id;
+    }
+
     protected $fillable = [
         'user_id',
         'specialization',

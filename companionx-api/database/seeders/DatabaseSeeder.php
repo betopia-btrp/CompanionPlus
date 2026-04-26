@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -11,14 +12,13 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $freePatientPlan = SubscriptionPlan::where('name', 'Free')
+            ->where('type', 'patient')
+            ->first();
 
-        User::updateOrCreate(
+        $user = User::updateOrCreate(
             ['email' => 'test@example.com'],
             [
                 'first_name' => 'Test',
@@ -29,8 +29,18 @@ class DatabaseSeeder extends Seeder
                 'gender' => 'other',
                 'guardian_contact' => null,
                 'system_role' => 'patient',
+                'subscription_plan_id' => $freePatientPlan?->id,
             ]
         );
+
+        if ($freePatientPlan && !$user->subscriptions()->where('status', 'active')->exists()) {
+            $user->subscriptions()->create([
+                'subscription_plan_id' => $freePatientPlan->id,
+                'status' => 'active',
+                'current_period_start' => now(),
+                'free_sessions_remaining' => $freePatientPlan->getFeature('free_sessions', 0),
+            ]);
+        }
 
         $this->call(ConsultantSeeder::class);
     }
