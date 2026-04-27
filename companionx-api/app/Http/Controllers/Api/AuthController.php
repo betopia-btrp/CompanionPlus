@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsultantProfile;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +47,23 @@ class AuthController extends Controller
                 'user_id' => $user->id,
             ]);
         }
+
+        $plan = SubscriptionPlan::where('name', 'Free')
+            ->where('type', $systemRole)
+            ->first();
+
+        if ($plan) {
+            $user->subscription_plan_id = $plan->id;
+            $user->save();
+
+            $user->subscriptions()->create([
+                'subscription_plan_id' => $plan->id,
+                'status' => 'active',
+                'current_period_start' => now(),
+                'free_sessions_remaining' => $plan->getFeature('free_sessions', 0),
+            ]);
+        }
+
         Auth::login($user);
         $request->session()->regenerate();
 
@@ -86,6 +105,15 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user()->load([
+            'subscriptionPlan',
+            'activeSubscription',
+        ]);
+
+        return response()->json([
+            ...$user->toArray(),
+            'active_subscription' => $user->activeSubscription()->exists(),
+            'free_sessions_remaining' => $user->activeSubscription?->free_sessions_remaining ?? 0,
+        ]);
     }
 }

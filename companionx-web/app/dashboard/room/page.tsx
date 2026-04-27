@@ -1,16 +1,94 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { VideoCamera, PhoneSlash } from "@phosphor-icons/react";
+import { fetchCurrentUser } from "@/lib/auth";
+import { VideoCamera, PhoneSlash, Spinner } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
 export default function RoomPage() {
   const searchParams = useSearchParams();
   const roomUuid = searchParams.get("room");
   const router = useRouter();
+  const jitsiContainerRef = useRef<HTMLDivElement>(null);
+  const jitsiApiRef = useRef<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
   const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    fetchCurrentUser().then((u) => {
+      if (u) {
+        const isPatient = u.system_role === "patient";
+        if (isPatient) {
+          const hash = u.id.toString(16).toUpperCase().padStart(4, "0").slice(-4);
+          setUserName(`User #${hash}`);
+        } else {
+          setUserName(`${u.first_name} ${u.last_name}`);
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!roomUuid || !userName || !jitsiContainerRef.current) return;
+
+    const domain = "meet.jit.si";
+    const script = document.createElement("script");
+    script.src = `https://${domain}/external_api.js`;
+    script.async = true;
+
+    script.onload = () => {
+      const JitsiMeetExternalAPI = (window as any).JitsiMeetExternalAPI;
+      const api = new JitsiMeetExternalAPI(domain, {
+        roomName: roomUuid,
+        parentNode: jitsiContainerRef.current,
+        configOverrides: {
+          prejoinPageEnabled: false,
+          enableLobby: false,
+          doNotStoreRoom: true,
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          disableDeepLinking: true,
+          toolbarButtons: [
+            "microphone", "camera", "closedcaptions", "desktop",
+            "fullscreen", "fodeviceselection", "hangup",
+            "profile", "chat", "raisehand",
+            "tileview", "settings",
+          ],
+        },
+        interfaceConfigOverrides: {
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          TOOLBAR_ALWAYS_VISIBLE: true,
+          HIDE_INVITE_MORE_HEADER: true,
+          DISABLE_PRESENCE_STATUS: true,
+        },
+        userInfo: {
+          displayName: userName,
+        },
+      });
+
+      jitsiApiRef.current = api;
+      setLoading(false);
+
+      api.addListener("readyToClose", () => {
+        router.push("/dashboard");
+      });
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      if (jitsiApiRef.current) {
+        jitsiApiRef.current.dispose();
+        jitsiApiRef.current = null;
+      }
+      const scriptEl = document.querySelector(`script[src="https://${domain}/external_api.js"]`);
+      if (scriptEl) scriptEl.remove();
+    };
+  }, [roomUuid, userName, router]);
 
   useEffect(() => {
     if (!roomUuid) return;
@@ -67,22 +145,32 @@ export default function RoomPage() {
           variant="outline"
           size="sm"
           className="text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10"
-          onClick={() => router.push("/dashboard")}
+          onClick={() => {
+            if (jitsiApiRef.current) jitsiApiRef.current.dispose();
+            router.push("/dashboard");
+          }}
         >
           <PhoneSlash size={14} weight="bold" />
           End Session
         </Button>
       </div>
 
-      {/* ── Jitsi iframe ─────────────────────────────────────────── */}
-      <div className="relative w-full" style={{ height: "calc(100vh - 3.5rem - 65px)" }}>
-        <iframe
-          src={`https://meet.jit.si/${roomUuid}`}
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          className="absolute inset-0 w-full h-full border-0"
-          title="Video Session"
-        />
-      </div>
+      {/* ── Jitsi container ────────────────────────────────────── */}
+      {loading && (
+        <div className="flex items-center justify-center" style={{ height: "calc(100vh - 3.5rem - 65px)" }}>
+          <div className="text-center">
+            <Spinner size={24} className="mx-auto mb-3 animate-spin text-muted-foreground" />
+            <p className="font-sans text-sm text-muted-foreground">
+              Joining session as {userName}...
+            </p>
+          </div>
+        </div>
+      )}
+      <div
+        ref={jitsiContainerRef}
+        className="w-full"
+        style={{ height: "calc(100vh - 3.5rem - 65px)", display: loading ? "none" : "block" }}
+      />
     </div>
   );
 }

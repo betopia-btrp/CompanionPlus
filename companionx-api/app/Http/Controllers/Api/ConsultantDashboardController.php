@@ -388,9 +388,7 @@ class ConsultantDashboardController extends Controller
         return [
             'id' => $booking->id,
             'patient_ref' => $patientRef,
-            'patient_name' => $patient
-                ? trim($patient->first_name . ' ' . $patient->last_name)
-                : 'Unknown',
+            'patient_name' => $patientRef,
             'status' => $booking->status,
             'scheduled_start' => $booking->scheduled_start?->toISOString(),
             'scheduled_end' => $booking->scheduled_end?->toISOString(),

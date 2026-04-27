@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\ConsultantController;
 use App\Http\Controllers\Api\ExerciseController;
+use App\Http\Controllers\Api\SubscriptionController;
 
 Route::post("/register", [AuthController::class, "register"]);
 Route::post("/login", [AuthController::class, "login"]);
@@ -20,12 +21,20 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::get("/user", function (Request $request) {
         return $request->user();
     });
+    Route::get("/profile", [App\Http\Controllers\Api\ProfileController::class, "show"]);
+    Route::patch("/profile", [App\Http\Controllers\Api\ProfileController::class, "update"]);
+
+    Route::get("/subscription/plans", [SubscriptionController::class, "index"]);
+    Route::post("/subscription/checkout", [SubscriptionController::class, "checkout"]);
+    Route::post("/subscription/complete", [SubscriptionController::class, "complete"]);
+    Route::get("/bookings", [BookingFlowController::class, "myBookings"]);
 
     Route::middleware("patient")->group(function () {
         Route::post("/onboarding", [OnboardingController::class, "store"]);
         Route::get("/dashboard/summary", [DashboardController::class, "getDashboardSummary"]);
         Route::get("/dashboard/next-appointment", [DashboardController::class, "getNextAppointment"]);
         Route::get("/consultants", [ConsultantController::class, "index"]);
+        Route::get("/consultants/{consultantId}", [ConsultantController::class, "show"]);
         Route::get("/consultants/{consultantId}/slots", [
             BookingFlowController::class,
             "slots",
@@ -39,6 +48,8 @@ Route::middleware("auth:sanctum")->group(function () {
             BookingFlowController::class,
             "release",
         ]);
+    Route::post("/bookings/checkout", [BookingFlowController::class, "checkout"]);
+    Route::post("/bookings/complete", [BookingFlowController::class, "complete"]);
         Route::get("/dashboard/recommendations", [
             DashboardController::class,
             "getRecommendations",
@@ -50,6 +61,14 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::patch("/dashboard/exercises/progress", [
             DashboardController::class,
             "updateExerciseProgress",
+        ]);
+        Route::get("/exercise-plans/{planId}", [
+            DashboardController::class,
+            "getExercisePlan",
+        ]);
+        Route::post("/exercise-plans/start", [
+            DashboardController::class,
+            "startExercisePlan",
         ]);
         Route::get("/dashboard/remix", [DashboardController::class, "remix"]);
 

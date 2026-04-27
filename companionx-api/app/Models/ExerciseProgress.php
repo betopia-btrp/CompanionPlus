@@ -11,7 +11,7 @@ class ExerciseProgress extends Model
 
     protected $fillable = [
         'user_id',
-        'recommendation_id',
+        'exercise_plan_id',
         'completed_task_keys',
         'completed_chapter_keys',
         'completion_percentage',
@@ -38,9 +38,9 @@ class ExerciseProgress extends Model
         ];
     }
 
-    public function recommendation(): BelongsTo
+    public function plan(): BelongsTo
     {
-        return $this->belongsTo(AiRecommendation::class, 'recommendation_id');
+        return $this->belongsTo(ExercisePlan::class, 'exercise_plan_id');
     }
 
     public function user(): BelongsTo

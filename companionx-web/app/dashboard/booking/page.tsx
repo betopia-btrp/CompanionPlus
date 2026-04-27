@@ -5,14 +5,10 @@ import api from "@/lib/axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
-  Clock,
-  Hourglass,
+  CalendarBlank,
   Star,
   VideoCamera,
-  CaretDown,
-  CaretUp,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,15 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type Slot = {
-  id: number;
-  start_datetime: string;
-  end_datetime: string;
-  status: "available" | "held" | "held_by_you" | "booked";
-  hold_expires_at?: string | null;
-  remaining_seconds?: number | null;
-};
 
 type Consultant = {
   id: number;
@@ -43,7 +30,12 @@ type Consultant = {
     available_count: number;
     next_available_slot?: string | null;
   };
-  slots?: Slot[];
+  slots?: {
+    id: number;
+    start_datetime: string;
+    end_datetime: string;
+    status: string;
+  }[];
   user: {
     first_name: string;
     last_name: string;
@@ -58,7 +50,8 @@ type BookingPayload = {
       | "ready"
       | "pending"
       | "missing_onboarding"
-      | "unavailable";
+      | "unavailable"
+      | "premium_required";
     generated_at?: string | null;
     profile_summary?: {
       primary_concern?: string;
@@ -67,11 +60,6 @@ type BookingPayload = {
       keywords?: string[];
     } | null;
     recommended_consultants: Consultant[];
-    chapters?: {
-      chapter_title: string;
-      content: string;
-      estimated_time: string;
-    }[];
   };
   current_hold?: {
     slot_id: number;
@@ -84,50 +72,14 @@ type BookingPayload = {
   } | null;
 };
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatCountdown(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
 export default function BookingPage() {
   const [data, setData] = useState<BookingPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeHoldSlotId, setActiveHoldSlotId] = useState<number | null>(null);
-  const [nowMs, setNowMs] = useState(0);
   const [filters, setFilters] = useState({
     specialization: "",
     max_rate: 5000,
   });
   const router = useRouter();
-
-  const fetchData = async (options?: { silent?: boolean }) => {
-    if (!options?.silent) setLoading(true);
-    try {
-      const res = await api.get("/api/consultants", { params: filters });
-      setData(res.data);
-    } catch (error) {
-      console.error("Error fetching booking data", error);
-    } finally {
-      if (!options?.silent) setLoading(false);
-    }
-  };
 
   useEffect(() => {
     let ignore = false;
@@ -147,53 +99,8 @@ export default function BookingPage() {
     };
   }, [filters]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const currentHoldRemaining = useMemo(() => {
-    const holdExpiry = data?.current_hold?.hold_expires_at;
-    if (!holdExpiry) return null;
-    if (nowMs === 0) return data?.current_hold?.remaining_seconds ?? null;
-    return Math.max(
-      0,
-      Math.floor((new Date(holdExpiry).getTime() - nowMs) / 1000),
-    );
-  }, [
-    data?.current_hold?.hold_expires_at,
-    data?.current_hold?.remaining_seconds,
-    nowMs,
-  ]);
-
   const recommendationStatus = data?.ai_data?.recommendation_status;
   const recommendedConsultants = data?.ai_data?.recommended_consultants ?? [];
-
-  const holdSlot = async (slotId: number) => {
-    setActiveHoldSlotId(slotId);
-
-    try {
-      await api.post("/api/booking/hold", { slot_id: slotId });
-      await fetchData({ silent: true });
-    } catch (error) {
-      console.error("Failed to hold slot", error);
-    } finally {
-      setActiveHoldSlotId(null);
-    }
-  };
-
-  const releaseHold = async (slotId: number) => {
-    setActiveHoldSlotId(slotId);
-
-    try {
-      await api.delete(`/api/booking/hold/${slotId}`);
-      await fetchData({ silent: true });
-    } catch (error) {
-      console.error("Failed to release hold", error);
-    } finally {
-      setActiveHoldSlotId(null);
-    }
-  };
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
@@ -211,45 +118,6 @@ export default function BookingPage() {
             </div>
           </div>
         </header>
-
-        {/* ── Active Hold ────────────────────────────────────────── */}
-        {data?.current_hold ? (
-          <div className="mb-6 border border-primary/40 bg-primary/5 p-6">
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <span className="font-sans text-xs font-medium tracking-[0.12em] text-primary uppercase border border-primary/40 px-2 py-0.5">
-                  Active Slot Hold
-                </span>
-                <p className="mt-2 font-heading text-lg font-medium text-foreground">
-                  {data.current_hold.consultant_name}
-                </p>
-                <p className="mt-1 font-sans text-sm text-muted-foreground">
-                  {formatDateTime(data.current_hold.start_datetime)} &ndash;{" "}
-                  {formatTime(data.current_hold.end_datetime)}
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="border border-border bg-card px-5 py-4 text-center">
-                  <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                    Time Left
-                  </p>
-                  <p className="mt-1 font-mono text-2xl font-semibold text-foreground">
-                    {formatCountdown(currentHoldRemaining ?? 0)}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs font-medium"
-                  onClick={() => releaseHold(data.current_hold!.slot_id)}
-                  disabled={activeHoldSlotId === data.current_hold.slot_id}
-                >
-                  Release Hold
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {/* ── AI Recommendations ─────────────────────────────────── */}
         <section className="mb-10">
@@ -286,9 +154,6 @@ export default function BookingPage() {
                   key={consultant.id}
                   consultant={consultant}
                   isMatch
-                  activeHoldSlotId={activeHoldSlotId}
-                  onHoldSlot={holdSlot}
-                  onReleaseHold={releaseHold}
                 />
               ))}
             </div>
@@ -301,6 +166,28 @@ export default function BookingPage() {
                 Onboarding is complete. The queue is generating your top
                 consultant recommendations now.
               </p>
+            </div>
+          ) : recommendationStatus === "premium_required" ? (
+            <div className="relative overflow-hidden border border-border bg-card">
+              <div className="absolute inset-0 backdrop-blur-sm bg-card/40 z-10 flex items-center justify-center">
+                <div className="text-center px-6 py-8">
+                  <VideoCamera size={24} weight="bold" className="mx-auto mb-3 text-muted-foreground" />
+                  <p className="mb-1 font-heading text-sm font-medium text-foreground">
+                    Unlock AI-Powered Recommendations
+                  </p>
+                  <p className="mx-auto max-w-xs font-sans text-xs text-muted-foreground mb-5">
+                    Upgrade to Pro for personalized consultant matches, AI exercises, and more.
+                  </p>
+                  <Button size="sm" className="text-xs font-medium" onClick={() => router.push("/pricing")}>
+                    Upgrade to Pro
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 p-10 opacity-30 pointer-events-none select-none">
+                {[1, 2].map((card) => (
+                  <div key={card} className="h-48 border border-border bg-muted" />
+                ))}
+              </div>
             </div>
           ) : (
             <div className="border border-dashed border-border bg-card p-10 text-center">
@@ -391,9 +278,6 @@ export default function BookingPage() {
                 <ConsultantCard
                   key={consultant.id}
                   consultant={consultant}
-                  activeHoldSlotId={activeHoldSlotId}
-                  onHoldSlot={holdSlot}
-                  onReleaseHold={releaseHold}
                 />
               ))}
             </div>
@@ -407,21 +291,34 @@ export default function BookingPage() {
 function ConsultantCard({
   consultant,
   isMatch = false,
-  activeHoldSlotId,
-  onHoldSlot,
-  onReleaseHold,
 }: {
   consultant: Consultant;
   isMatch?: boolean;
-  activeHoldSlotId: number | null;
-  onHoldSlot: (slotId: number) => Promise<void>;
-  onReleaseHold: (slotId: number) => Promise<void>;
 }) {
-  const [expanded, setExpanded] = useState(isMatch);
-  const upcomingSlots = consultant.slots ?? [];
-  const firstAvailableSlot = upcomingSlots.find(
-    (slot) => slot.status === "available",
-  );
+  const router = useRouter();
+
+  const availableDays = useMemo(() => {
+    if (!consultant.slots) return [];
+    const days = new Set<number>();
+    consultant.slots.forEach((s) => {
+      if (s.status === "available") {
+        days.add(new Date(s.start_datetime).getDay());
+      }
+    });
+    return Array.from(days).sort();
+  }, [consultant.slots]);
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const formatNextSlot = (iso?: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div
@@ -464,116 +361,56 @@ function ConsultantCard({
 
       {/* ── Bio ──────────────────────────────────────────────────── */}
       <div className="px-5 pb-4">
-        <p
-          className={`font-sans text-xs leading-relaxed text-muted-foreground ${
-            expanded ? "" : "line-clamp-3"
-          }`}
-        >
+        <p className="font-sans text-xs leading-relaxed text-muted-foreground line-clamp-3">
           {consultant.bio || "No biography provided."}
         </p>
       </div>
 
-      {/* ── Actions ──────────────────────────────────────────────── */}
-      <div className="px-5 pb-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="flex items-center gap-1 font-sans text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {expanded ? (
-            <CaretUp size={12} weight="bold" />
-          ) : (
-            <CaretDown size={12} weight="bold" />
-          )}
-          {expanded ? "Hide" : "View"} Slots
-        </button>
-      </div>
-
-      {/* ── Slots Panel ──────────────────────────────────────────── */}
-      {expanded ? (
-        <div className="mx-5 mb-4 border border-border bg-muted/30 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                Availability
-              </p>
-              <p className="mt-0.5 font-sans text-sm font-medium text-foreground">
-                {consultant.slot_summary?.available_count ?? 0} slots available
-              </p>
-            </div>
-            {consultant.slot_summary?.next_available_slot ? (
-              <div className="text-right">
-                <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                  Next Slot
-                </p>
-                <p className="mt-0.5 font-sans text-xs text-foreground">
-                  {formatDateTime(consultant.slot_summary.next_available_slot)}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
+      {/* ── Availability ─────────────────────────────────────────── */}
+      <div className="px-5 pb-4">
+        {consultant.slot_summary && consultant.slot_summary.available_count > 0 ? (
           <div className="space-y-2">
-            {upcomingSlots.length ? (
-              upcomingSlots.slice(0, 3).map((slot) => (
-                <div
-                  key={slot.id}
-                  className="border border-border bg-card px-4 py-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-sans text-xs font-medium text-foreground">
-                        {formatDateTime(slot.start_datetime)}
-                      </p>
-                      <p className="font-sans text-xs text-muted-foreground">
-                        until {formatTime(slot.end_datetime)}
-                      </p>
-                    </div>
-
-                    {slot.status === "available" ? (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="text-xs font-medium"
-                        onClick={() => onHoldSlot(slot.id)}
-                        disabled={activeHoldSlotId === slot.id}
-                      >
-                        {activeHoldSlotId === slot.id
-                          ? "Holding..."
-                          : "Hold 15 min"}
-                      </Button>
-                    ) : slot.status === "held_by_you" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs font-medium"
-                        onClick={() => onReleaseHold(slot.id)}
-                        disabled={activeHoldSlotId === slot.id}
-                      >
-                        Release
-                      </Button>
-                    ) : (
-                      <span className="font-sans text-xs font-medium text-muted-foreground uppercase">
-                        {slot.status === "held" ? "Held" : "Booked"}
-                      </span>
-                    )}
-                  </div>
-
-                  {slot.status === "held_by_you" && slot.hold_expires_at ? (
-                    <p className="mt-2 font-sans text-xs text-primary">
-                      Held until {formatTime(slot.hold_expires_at)}
-                    </p>
-                  ) : null}
-                </div>
-              ))
-            ) : (
-              <p className="font-sans text-xs text-muted-foreground">
-                No upcoming slots published yet.
-              </p>
+            <div className="flex items-center gap-2">
+              <CalendarBlank size={14} weight="bold" className="text-emerald-600" />
+              <span className="font-sans text-xs font-medium text-emerald-700">
+                {consultant.slot_summary.available_count} slot
+                {consultant.slot_summary.available_count > 1 ? "s" : ""} available
+              </span>
+              {consultant.slot_summary.next_available_slot && (
+                <span className="font-sans text-xs text-muted-foreground">
+                  · Next: {formatNextSlot(consultant.slot_summary.next_available_slot)}
+                </span>
+              )}
+            </div>
+            {availableDays.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="font-sans text-[10px] font-medium text-muted-foreground tracking-wider uppercase">
+                  Available:
+                </span>
+                {dayNames.map((name, i) => (
+                  <span
+                    key={i}
+                    className={`font-sans text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 border ${
+                      availableDays.includes(i)
+                        ? "border-emerald-500/40 text-emerald-700 bg-emerald-500/10"
+                        : "border-transparent text-muted-foreground/30"
+                    }`}
+                  >
+                    {name.slice(0, 2)}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
-        </div>
-      ) : null}
+        ) : (
+          <div className="flex items-center gap-2">
+            <CalendarBlank size={14} weight="bold" className="text-muted-foreground/40" />
+            <span className="font-sans text-xs text-muted-foreground/40">
+              No upcoming slots
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* ── Footer: Price + Book ─────────────────────────────────── */}
       <div className="mt-auto flex items-center justify-between border-t border-border px-5 py-4">
@@ -582,26 +419,17 @@ function ConsultantCard({
             ৳{consultant.base_rate_bdt}
           </span>
           <span className="ml-1 font-sans text-xs text-muted-foreground">
-            /session
+            /hr
           </span>
         </div>
-        {firstAvailableSlot ? (
-          <Button
-            size="sm"
-            className="text-xs font-medium"
-            onClick={() => onHoldSlot(firstAvailableSlot.id)}
-            disabled={activeHoldSlotId === firstAvailableSlot.id}
-          >
-            {activeHoldSlotId === firstAvailableSlot.id
-              ? "Holding..."
-              : "Book Slot"}
-            <ArrowRight size={12} weight="bold" />
-          </Button>
-        ) : (
-          <span className="font-sans text-xs font-medium text-muted-foreground uppercase">
-            No slots yet
-          </span>
-        )}
+        <Button
+          size="sm"
+          className="text-xs font-medium"
+          onClick={() => router.push(`/dashboard/booking/${consultant.id}`)}
+        >
+          Book Slot
+          <ArrowRight size={12} weight="bold" />
+        </Button>
       </div>
     </div>
   );

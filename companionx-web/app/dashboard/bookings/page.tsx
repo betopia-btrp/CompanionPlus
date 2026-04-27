@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/axios";
+import { fetchCurrentUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import {
   VideoCamera,
@@ -13,8 +14,8 @@ import { Button } from "@/components/ui/button";
 
 type Booking = {
   id: number;
-  patient_ref: string;
-  patient_name: string;
+  ref: string;
+  subtitle: string;
   status: string;
   scheduled_start: string;
   scheduled_end: string;
@@ -85,12 +86,17 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [isConsultant, setIsConsultant] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchCurrentUser().then((u) => setIsConsultant(u?.system_role === "consultant"));
+  }, []);
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/api/consultant/bookings", {
+      const res = await api.get("/api/bookings", {
         params: { status: activeTab, page },
       });
       setBookings(res.data.bookings);
@@ -141,7 +147,7 @@ export default function BookingsPage() {
         {/* ── Header ──────────────────────────────────────────────── */}
         <header className="mb-8">
           <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-            Consultant
+            {isConsultant ? "Consultant" : "User"}
           </p>
           <h1 className="font-heading text-2xl font-semibold text-foreground">
             Bookings
@@ -197,8 +203,13 @@ export default function BookingsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-sans text-sm font-medium text-foreground">
-                        {booking.patient_ref}
+                        {booking.ref}
                       </span>
+                      {booking.subtitle && (
+                        <span className="font-sans text-xs text-muted-foreground">
+                          {booking.subtitle}
+                        </span>
+                      )}
                       <span
                         className={`font-sans text-[10px] font-medium uppercase tracking-wider border px-2 py-0.5 ${getStatusStyle(booking.status)}`}
                       >
@@ -219,7 +230,7 @@ export default function BookingsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {booking.status === "pending" && (
+                  {isConsultant && booking.status === "pending" && (
                     <>
                       <Button
                         variant="outline"

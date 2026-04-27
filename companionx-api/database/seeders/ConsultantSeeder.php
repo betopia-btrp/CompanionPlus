@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Models\ConsultantProfile;
+use App\Models\SubscriptionPlan;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ class ConsultantSeeder extends Seeder
 {
     public function run(): void
     {
+        $freeConsultantPlan = SubscriptionPlan::where('name', 'Free')
+            ->where('type', 'consultant')
+            ->first();
+
         $consultants = [
             [
                 "name" => "Dr. Ariful Islam",
@@ -68,7 +73,7 @@ class ConsultantSeeder extends Seeder
         ];
 
         foreach ($consultants as $index => $c) {
-            DB::transaction(function () use ($c, $index) {
+            DB::transaction(function () use ($c, $index, $freeConsultantPlan) {
                 $names = explode(" ", $c["name"]);
                 $user = User::updateOrCreate(
                     [
@@ -83,6 +88,7 @@ class ConsultantSeeder extends Seeder
                         "dob" => "1985-01-01",
                         "gender" => "other",
                         "system_role" => "consultant",
+                        "subscription_plan_id" => $freeConsultantPlan?->id,
                     ],
                 );
 
@@ -97,6 +103,15 @@ class ConsultantSeeder extends Seeder
                         "is_approved" => true,
                     ],
                 );
+
+                if ($freeConsultantPlan && !$user->subscriptions()->where('status', 'active')->exists()) {
+                    $user->subscriptions()->create([
+                        'subscription_plan_id' => $freeConsultantPlan->id,
+                        'status' => 'active',
+                        'current_period_start' => now(),
+                        'free_sessions_remaining' => $freeConsultantPlan->getFeature('free_sessions', 0),
+                    ]);
+                }
             });
         }
     }

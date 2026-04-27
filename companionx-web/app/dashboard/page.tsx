@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarBlank,
   ArrowRight,
-  Clock,
-  BookOpen,
+  Barbell,
   Brain,
-  PlayCircle,
-  VideoCamera,
+  CalendarDots,
+  Crown,
+  Spinner,
+  Star,
   TrendUp,
+  VideoCamera,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/axios";
@@ -66,6 +68,7 @@ type DashboardData = {
     status: string;
     scheduled_start: string;
     scheduled_end: string;
+    jitsi_room_uuid: string;
     consultant: {
       name: string;
       specialization: string;
@@ -80,8 +83,8 @@ type DashboardData = {
   exercise: ExerciseData | null;
 };
 
-function getTimeUntil(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
+function getTimeUntil(iso: string, now: number = Date.now()) {
+  const diff = new Date(iso).getTime() - now;
   if (diff < 0) return "00:00:00";
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -118,7 +121,13 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(Date.now());
   const router = useRouter();
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -258,7 +267,7 @@ export default function DashboardPage() {
                         Starts In
                       </p>
                       <p className="mt-0.5 font-mono text-lg font-medium text-foreground">
-                        {getTimeUntil(appointment.scheduled_start)}
+                        {getTimeUntil(appointment.scheduled_start, now)}
                       </p>
                     </div>
                     <div>
@@ -274,7 +283,7 @@ export default function DashboardPage() {
                   <Button
                     className="text-xs font-medium"
                     size="sm"
-                    onClick={() => router.push("/dashboard/room")}
+                    onClick={() => router.push(`/dashboard/room?room=${appointment.jitsi_room_uuid}`)}
                   >
                     Join Session Now
                     <ArrowRight size={14} weight="bold" />
@@ -387,6 +396,39 @@ export default function DashboardPage() {
               </div>
             </div>
           </Link>
+        </div>
+
+        {/* ── Subscription Info ────────────────────────────────────── */}
+        <div className="mb-8 border border-border bg-card p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex aspect-square w-10 items-center justify-center border border-primary/30 bg-primary/5">
+                <Crown size={18} weight={user?.subscription_plan?.name !== "Free" ? "fill" : "regular"} className={user?.subscription_plan?.name !== "Free" ? "text-amber-500" : "text-muted-foreground"} />
+              </div>
+              <div>
+                <p className="font-heading text-sm font-semibold text-foreground">
+                  {user?.subscription_plan?.name ?? "Free"} Plan
+                </p>
+                <p className="font-sans text-xs text-muted-foreground">
+                  {user?.subscription_plan?.name === "Pro"
+                    ? "Unlimited AI recommendations, exercises, and sessions."
+                    : user?.active_subscription
+                      ? `${user.free_sessions_remaining ?? 0} free session${user.free_sessions_remaining !== 1 ? "s" : ""} remaining`
+                      : "Upgrade to unlock premium features."}
+                </p>
+              </div>
+            </div>
+            {user?.subscription_plan?.name !== "Pro" && (
+              <Button
+                size="sm"
+                className="shrink-0 text-xs font-medium"
+                onClick={() => router.push("/pricing")}
+              >
+                {user?.active_subscription ? "Upgrade" : "See Plans"}
+                <ArrowRight size={14} weight="bold" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* ── AI-Generated Exercises ─────────────────────────────────── */}
@@ -595,7 +637,7 @@ function ConsultantDashboard() {
             value={String(stats.today_sessions)}
           />
           <StatCard
-            label="Total Patients"
+            label="Total Users"
             value={stats.total_patients.toLocaleString()}
           />
           <StatCard
@@ -745,9 +787,9 @@ function ConsultantDashboard() {
             <div className="border border-border bg-card">
               {/* Table header */}
               <div className="grid grid-cols-4 border-b border-border bg-muted/30 px-6 py-3">
-                <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
-                  Patient Ref
-                </span>
+                  <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
+                    Ref
+                  </span>
                 <span className="font-sans text-xs font-semibold text-muted-foreground uppercase">
                   Requested Time
                 </span>

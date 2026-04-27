@@ -41,6 +41,7 @@ function Nav() {
             { label: "How it Works", href: "#how-it-works" },
             { label: "Features", href: "#features" },
             { label: "Stories", href: "#testimonials" },
+            { label: "Pricing", href: "/pricing" },
           ].map((link) => (
             <a
               key={link.label}
@@ -95,14 +96,16 @@ function Hero() {
     <section className="relative flex min-h-155 items-center overflow-hidden border-b border-border">
       {/* subtle grid bg */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10 opacity-40"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.3]"
         style={{
           backgroundImage:
             "repeating-linear-gradient(90deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)," +
             "repeating-linear-gradient(0deg,oklch(0.922 0 0) 0px,oklch(0.922 0 0) 1px,transparent 1px,transparent 48px)",
         }}
       />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-100 w-150 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-20 -z-10 h-120 w-120 -translate-y-1/2 rounded-full bg-primary/8 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-30 -left-20 -z-10 h-100 w-100 rounded-full bg-primary/3 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-primary/[0.01] via-transparent to-primary/[0.02]" />
 
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 px-8 py-20 md:px-12 lg:grid-cols-2">
         {/* Left */}

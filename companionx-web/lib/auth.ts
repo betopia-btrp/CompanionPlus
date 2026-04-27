@@ -7,6 +7,14 @@ export type AuthUser = {
   email: string;
   system_role: string;
   onboarding_completed?: boolean;
+  subscription_plan?: {
+    id: number;
+    name: string;
+    price: number;
+    features: Record<string, boolean | number | null>;
+  } | null;
+  active_subscription?: boolean;
+  free_sessions_remaining?: number;
 };
 
 export type LoginPayload = {

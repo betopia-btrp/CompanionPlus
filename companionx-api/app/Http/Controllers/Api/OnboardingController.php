@@ -37,8 +37,13 @@ class OnboardingController extends Controller
             $user->onboarding_completed = true;
             $user->save();
 
-            GenerateConsultantRecommendations::dispatch($user->id);
-            GenerateOnboardingExercises::dispatch($user->id);
+            if ($user->canAccessAiRecommendations()) {
+                GenerateConsultantRecommendations::dispatch($user->id);
+            }
+
+            if ($user->canAccessAiExercises()) {
+                GenerateOnboardingExercises::dispatch($user->id);
+            }
 
             return response()->json([
                 'message' => 'Onboarding successful',
