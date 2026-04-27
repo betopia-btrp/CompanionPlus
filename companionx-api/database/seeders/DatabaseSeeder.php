@@ -42,6 +42,9 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        $this->call(ConsultantSeeder::class);
+        $this->call([
+            AdminSeeder::class,
+            ConsultantSeeder::class,
+        ]);
     }
 }

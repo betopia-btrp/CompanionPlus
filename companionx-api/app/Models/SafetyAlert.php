@@ -29,4 +29,9 @@ class SafetyAlert extends Model
     {
         return $this->belongsTo(MoodJournal::class, 'journal_id');
     }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'patient_id');
+    }
 }

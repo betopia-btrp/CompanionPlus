@@ -1,15 +1,17 @@
 import axios from "axios";
 
-const defaultApiBaseUrl = "http://companionx-api.test/api";
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL;
 
-const configuredApiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL;
+function getDefaultApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return "http://localhost:8000";
+  }
+
+  return `${window.location.protocol}//${window.location.hostname}:8000`;
+}
 
 const api = axios.create({
-  baseURL:
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.BACKEND_URL ??
-    "http://localhost:8000",
+  baseURL: configuredApiBaseUrl ?? getDefaultApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
