@@ -235,7 +235,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="mt-6 flex items-center gap-6 border-t border-border pt-5">
-                {user?.free_sessions_remaining !== undefined && (
+                {isPatient && user?.free_sessions_remaining !== undefined && (
                   <div>
                     <p className="font-sans text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                       Free Sessions Left

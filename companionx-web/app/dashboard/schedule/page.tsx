@@ -63,6 +63,8 @@ type ScheduleData = {
   overrides: Override[];
   bookings: Booking[];
   templates: Template[];
+  used_hours?: number;
+  max_hours?: number | null;
 };
 
 type RBCEvent = {
@@ -386,6 +388,37 @@ export default function SchedulePage() {
             </Button>
           </div>
         </header>
+
+        {/*  Monthly Hours  */}
+        {data && (
+          <div className="mb-4 border border-border bg-card px-5 py-3 flex items-center gap-4 flex-wrap">
+            <span className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+              Monthly Hours
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-sans text-sm font-semibold text-foreground">
+                {data.used_hours ?? 0}
+              </span>
+              <span className="font-sans text-xs text-muted-foreground">
+                / {data.max_hours !== null && data.max_hours !== undefined ? `${data.max_hours} hr used` : "Unlimited"}
+              </span>
+            </div>
+            {data.max_hours !== null && data.max_hours !== undefined && (
+              <div className="flex-1 max-w-40 h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    (data.used_hours ?? 0) / data.max_hours > 0.8
+                      ? "bg-red-500"
+                      : (data.used_hours ?? 0) / data.max_hours > 0.6
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(100, ((data.used_hours ?? 0) / data.max_hours) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {statusMessage && (
           <div className="mb-4 border border-border bg-card px-5 py-3 font-sans text-xs text-foreground flex items-center justify-between">

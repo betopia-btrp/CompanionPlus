@@ -7,14 +7,18 @@ use App\Models\AvailabilityOverride;
 use App\Models\AvailabilityTemplate;
 use App\Models\Booking;
 use App\Models\Transaction;
+use App\Services\AvailabilityService;
 use App\Services\ConsultantSchedulingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class ConsultantDashboardController extends Controller
 {
+    public function __construct(
+        private readonly AvailabilityService $availabilityService,
+    ) {}
+
     public function show(Request $request, ConsultantSchedulingService $service)
     {
         return response()->json(
@@ -113,7 +117,7 @@ class ConsultantDashboardController extends Controller
         $start = Carbon::parse($validated['start_date'])->startOfDay();
         $end = Carbon::parse($validated['end_date'])->endOfDay();
 
-        $windows = $this->computeWindows($profile->user_id, $start, $end);
+        $windows = $this->availabilityService->computeWindows($profile->user_id, $start, $end);
 
         $overrides = AvailabilityOverride::where('consultant_id', $profile->user_id)
             ->whereBetween('start_datetime', [$start, $end])
@@ -145,16 +149,32 @@ class ConsultantDashboardController extends Controller
             ->map(fn (AvailabilityTemplate $t) => [
                 'id' => $t->id,
                 'day_of_week' => $t->day_of_week,
-                'start_time' => $t->start_time instanceof Carbon ? $t->start_time->format('H:i') : (string) $t->start_time,
-                'end_time' => $t->end_time instanceof Carbon ? $t->end_time->format('H:i') : (string) $t->end_time,
+                'start_time' => $t->start_time
+                    ? Carbon::parse($t->start_time->format('H:i'), 'UTC')->setTimezone('Asia/Dhaka')->format('H:i')
+                    : '',
+                'end_time' => $t->end_time
+                    ? Carbon::parse($t->end_time->format('H:i'), 'UTC')->setTimezone('Asia/Dhaka')->format('H:i')
+                    : '',
             ])
             ->values();
+
+        $plan = $profile->user?->subscriptionPlan;
+        $maxHours = $plan?->getFeature('max_available_hours_per_month');
+
+        $bookedMinutes = Booking::where('consultant_id', $profile->user_id)
+            ->whereIn('status', ['booked', 'confirmed'])
+            ->where('scheduled_start', '>=', now()->startOfMonth())
+            ->where('scheduled_start', '<=', now()->endOfMonth())
+            ->get()
+            ->sum(fn (Booking $b) => $b->scheduled_start->diffInMinutes($b->scheduled_end));
 
         return response()->json([
             'windows' => $windows,
             'overrides' => $overrides,
             'bookings' => $bookings,
             'templates' => $templates,
+            'used_hours' => round($bookedMinutes / 60, 1),
+            'max_hours' => $maxHours,
         ]);
     }
 
@@ -173,9 +193,12 @@ class ConsultantDashboardController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
 
+        $startUtc = Carbon::parse($validated['start_time'], 'Asia/Dhaka')->setTimezone('UTC');
+        $endUtc = Carbon::parse($validated['end_time'], 'Asia/Dhaka')->setTimezone('UTC');
+
         $template = AvailabilityTemplate::updateOrCreate(
             ['consultant_id' => $profile->user_id, 'day_of_week' => $validated['day_of_week']],
-            ['start_time' => $validated['start_time'], 'end_time' => $validated['end_time']]
+            ['start_time' => $startUtc->format('H:i'), 'end_time' => $endUtc->format('H:i')]
         );
 
         return response()->json([
@@ -315,117 +338,6 @@ class ConsultantDashboardController extends Controller
                 'current_page' => $transactions->currentPage(), 'last_page' => $transactions->lastPage(),
             ],
         ]);
-    }
-
-    // ── Computed Availability ─────────────────────────────────────────
-
-    private function computeWindows(int $consultantId, Carbon $start, Carbon $end): array
-    {
-        $templates = AvailabilityTemplate::where('consultant_id', $consultantId)->get();
-        $overrides = AvailabilityOverride::where('consultant_id', $consultantId)
-            ->whereBetween('start_datetime', [$start, $end])->get();
-        $bookings = Booking::where('consultant_id', $consultantId)
-            ->whereIn('status', ['booked', 'confirmed'])
-            ->whereBetween('scheduled_start', [$start, $end])->get();
-
-        $windows = [];
-
-        $current = $start->copy()->startOfDay();
-        while ($current->lte($end)) {
-            $dayTemplates = $templates->where('day_of_week', $current->dayOfWeek);
-
-            foreach ($dayTemplates as $tpl) {
-                // Build template start/end for this specific day
-                $dateStr = $current->format('Y-m-d');
-                $startTime = $tpl->start_time instanceof Carbon ? $tpl->start_time->format('H:i') : (string) $tpl->start_time;
-                $endTime = $tpl->end_time instanceof Carbon ? $tpl->end_time->format('H:i') : (string) $tpl->end_time;
-                $tplStart = Carbon::parse($dateStr . ' ' . $startTime, 'Asia/Dhaka')->setTimezone('UTC');
-                $tplEnd = Carbon::parse($dateStr . ' ' . $endTime, 'Asia/Dhaka')->setTimezone('UTC');
-
-                $occupied = collect();
-
-                foreach ($bookings as $b) {
-                    if ($b->scheduled_start->lt($tplEnd) && $b->scheduled_end->gt($tplStart)) {
-                        $occupied->push([
-                            'start' => $b->scheduled_start->gt($tplStart) ? $b->scheduled_start : $tplStart,
-                            'end' => $b->scheduled_end->lt($tplEnd) ? $b->scheduled_end : $tplEnd,
-                        ]);
-                    }
-                }
-
-                foreach ($overrides->where('type', 'blocked') as $o) {
-                    if ($o->start_datetime->lt($tplEnd) && $o->end_datetime->gt($tplStart)) {
-                        $occupied->push([
-                            'start' => $o->start_datetime->gt($tplStart) ? $o->start_datetime : $tplStart,
-                            'end' => $o->end_datetime->lt($tplEnd) ? $o->end_datetime : $tplEnd,
-                        ]);
-                    }
-                }
-
-                $occupied = $occupied->sortBy(fn ($s) => $s['start']->timestamp)->values();
-
-                $merged = [];
-                foreach ($occupied as $seg) {
-                    if (empty($merged)) {
-                        $merged[] = $seg;
-                    } else {
-                        $last = &$merged[count($merged) - 1];
-                        if ($seg['start']->lte($last['end'])) {
-                            $last['end'] = $seg['end']->gt($last['end']) ? $seg['end'] : $last['end'];
-                        } else {
-                            $merged[] = $seg;
-                        }
-                    }
-                }
-
-                $cursor = $tplStart->copy();
-                foreach ($merged as $seg) {
-                    if ($seg['start']->gt($cursor)) {
-                        $windows[] = [
-                            'start_datetime' => $cursor->toISOString(),
-                            'end_datetime' => $seg['start']->toISOString(),
-                        ];
-                    }
-                    if ($seg['end']->gt($cursor)) {
-                        $cursor = $seg['end']->copy();
-                    }
-                }
-                if ($cursor->lt($tplEnd)) {
-                    $windows[] = [
-                        'start_datetime' => $cursor->toISOString(),
-                        'end_datetime' => $tplEnd->toISOString(),
-                    ];
-                }
-            }
-
-            foreach ($overrides->where('type', 'available') as $o) {
-                if ($o->start_datetime->toDateString() === $current->toDateString()) {
-                    $inTemplate = false;
-                    foreach ($dayTemplates as $tpl) {
-                        $dateStr = $current->format('Y-m-d');
-                        $startTime = $tpl->start_time instanceof Carbon ? $tpl->start_time->format('H:i') : (string) $tpl->start_time;
-                        $endTime = $tpl->end_time instanceof Carbon ? $tpl->end_time->format('H:i') : (string) $tpl->end_time;
-                        $tplStart = Carbon::parse($dateStr . ' ' . $startTime, 'Asia/Dhaka')->setTimezone('UTC');
-                        $tplEnd = Carbon::parse($dateStr . ' ' . $endTime, 'Asia/Dhaka')->setTimezone('UTC');
-                        if ($o->start_datetime->gte($tplStart) && $o->end_datetime->lte($tplEnd)) {
-                            $inTemplate = true;
-                            break;
-                        }
-                    }
-                    if (!$inTemplate) {
-                        $windows[] = [
-                            'start_datetime' => $o->start_datetime->toISOString(),
-                            'end_datetime' => $o->end_datetime->toISOString(),
-                        ];
-                    }
-                }
-            }
-
-            $current->addDay();
-        }
-
-        usort($windows, fn ($a, $b) => $a['start_datetime'] <=> $b['start_datetime']);
-        return $windows;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
