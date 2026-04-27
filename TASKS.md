@@ -1,1 +1,0 @@
-1. in consultant http://localhost:3000/dashboard/schedule page, when i'm creating template, there are some issues, the time doens't match when theey are created. review the whole design and way it's working, like the templates and the slots and plan.
