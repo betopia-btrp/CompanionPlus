@@ -419,7 +419,7 @@ function ConsultantCard({
             ৳{consultant.base_rate_bdt}
           </span>
           <span className="ml-1 font-sans text-xs text-muted-foreground">
-            /session
+            /hr
           </span>
         </div>
         <Button

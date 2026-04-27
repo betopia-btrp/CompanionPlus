@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\AiRecommendation;
+use App\Models\ExercisePlan;
 use App\Models\MoodJournal;
 use App\Services\ExerciseService;
 use Illuminate\Bus\Queueable;
@@ -34,48 +34,38 @@ class GenerateMentalExercises implements ShouldQueue
 
         if (!$journal instanceof MoodJournal) {
             Log::warning('GenerateMentalExercises: Journal not found.', ['journal_id' => $this->journalId]);
-
             return;
         }
 
-        // Throttle: skip if exercise was generated less than THROTTLE_HOURS ago
-        $latestExercise = AiRecommendation::where('user_id', $journal->user_id)
-            ->where('rec_type', 'exercise')
+        $user = $journal->user;
+
+        if (!$user || !$user->canAccessAiExercises()) {
+            return;
+        }
+
+        $latestPlan = ExercisePlan::where('user_id', $journal->user_id)
+            ->where('origin', 'ai')
             ->latest()
             ->first();
 
-        if ($latestExercise && $latestExercise->created_at->diffInHours(now()) < self::THROTTLE_HOURS) {
+        if ($latestPlan && $latestPlan->created_at->diffInHours(now()) < self::THROTTLE_HOURS) {
             Log::info('GenerateMentalExercises: Skipping, throttled.', [
                 'user_id' => $journal->user_id,
-                'last_generated' => $latestExercise->created_at->toIso8601String(),
+                'last_generated' => $latestPlan->created_at->toIso8601String(),
             ]);
-
             return;
         }
 
-        Log::info('GenerateMentalExercises: Starting.', [
-            'journal_id' => $journal->id,
-            'user_id' => $journal->user_id,
-        ]);
-
         $exercisePlan = $exerciseService->generateForJournal($journal);
+        $title = data_get($exercisePlan, 'journey.headline', 'Daily Recovery Quest');
 
-        Log::info('GenerateMentalExercises: Plan generated, saving.', [
+        ExercisePlan::create([
             'user_id' => $journal->user_id,
-            'has_chapters' => count(data_get($exercisePlan, 'chapters', [])),
-            'phase' => data_get($exercisePlan, 'phase'),
+            'origin' => 'ai',
+            'title' => $title,
+            'description' => data_get($exercisePlan, 'journey.motivation', ''),
+            'estimated_time' => null,
+            'content_json' => $exercisePlan,
         ]);
-
-        // One exercise plan per user, overwritten each time
-        AiRecommendation::updateOrCreate(
-            [
-                'user_id' => $journal->user_id,
-                'rec_type' => 'exercise',
-            ],
-            [
-                'source_journal_id' => $journal->id,
-                'content_json' => $exercisePlan,
-            ]
-        );
     }
 }

@@ -105,11 +105,15 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load('subscriptionPlan');
+        $user = $request->user()->load([
+            'subscriptionPlan',
+            'activeSubscription',
+        ]);
 
         return response()->json([
             ...$user->toArray(),
             'active_subscription' => $user->activeSubscription()->exists(),
+            'free_sessions_remaining' => $user->activeSubscription?->free_sessions_remaining ?? 0,
         ]);
     }
 }

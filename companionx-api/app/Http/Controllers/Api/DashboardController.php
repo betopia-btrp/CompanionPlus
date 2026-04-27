@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiRecommendation;
 use App\Models\Booking;
 use App\Models\ConsultantProfile;
+use App\Models\ExercisePlan;
 use App\Services\ExerciseProgressService;
 use App\Services\ExerciseService;
 use App\Services\MatchingService;
@@ -55,42 +56,76 @@ class DashboardController extends Controller
         ExerciseProgressService $exerciseProgressService
     ) {
         $user = $request->user();
-        $exercise = AiRecommendation::where('user_id', $user->id)
-            ->where('rec_type', 'exercise')
-            ->latest()
-            ->first();
 
-        if (!$exercise) {
-            if ($user->onboarding_completed) {
-                return response()->json([
-                    'status' => 'pending',
-                    'message' => 'Your exercise plan is being generated.',
-                    'chapters' => [],
-                    'progress' => null,
-                    'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
-                ], 202);
-            }
+        $templates = ExercisePlan::where('user_id', null)
+            ->where('origin', 'template')
+            ->get();
 
-            return response()->json([
-                'status' => 'missing_onboarding',
-                'message' => 'Complete onboarding to unlock your first exercise plan.',
-                'chapters' => [],
-                'progress' => null,
-                'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
-            ], 404);
+        $userPlans = ExercisePlan::where('user_id', $user->id)
+            ->where('origin', 'ai')
+            ->get();
+
+        $allProgress = \App\Models\ExerciseProgress::where('user_id', $user->id)
+            ->get()
+            ->keyBy('exercise_plan_id');
+
+        $plans = $templates->concat($userPlans)->map(function ($plan) use ($allProgress) {
+            $p = $allProgress->get($plan->id);
+            return [
+                'id' => $plan->id,
+                'title' => $plan->title,
+                'description' => $plan->description,
+                'estimated_time' => $plan->estimated_time,
+                'origin' => $plan->origin,
+                'user_id' => $plan->user_id,
+                'status' => $p ? ($p->completed_at ? 'completed' : 'in_progress') : 'not_started',
+                'completion_percentage' => $p ? $p->completion_percentage : 0,
+                'badge_name' => $p ? $p->earned_badge_name : null,
+            ];
+        })->values();
+
+        return response()->json([
+            'plans' => $plans,
+            'can_access_ai' => $user->canAccessAiExercises(),
+            'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
+        ]);
+    }
+
+    public function getExercisePlan(
+        $planId,
+        Request $request,
+        ExerciseService $exerciseService,
+        ExerciseProgressService $exerciseProgressService
+    ) {
+        $user = $request->user();
+
+        $plan = ExercisePlan::findOrFail($planId);
+
+        if ($plan->user_id !== null && $plan->user_id !== $user->id) {
+            abort(403, 'Access denied.');
         }
 
-        $exercisePayload = $exerciseService->normalizeStoredPayload($exercise->content_json);
-        $progress = $exerciseProgressService->buildProgressPayload(
-            $exercise->exerciseProgress,
-            $exercisePayload,
+        $progress = \App\Models\ExerciseProgress::firstOrCreate(
+            ['user_id' => $user->id, 'exercise_plan_id' => $plan->id],
+            [
+                'completed_task_keys' => '[]',
+                'completed_chapter_keys' => '[]',
+                'completion_percentage' => 0,
+            ]
+        );
+
+        $payload = $plan->content_json;
+        $progressPayload = $exerciseProgressService->buildProgressPayload(
+            $progress,
+            $payload,
             $exerciseService->badgeTrack()
         );
 
-        return response()->json(array_merge($exercisePayload, [
-            'recommendation_id' => $exercise->id,
-            'progress' => $progress,
-            'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
+        return response()->json(array_merge($payload, [
+            'plan_id' => $plan->id,
+            'origin' => $plan->origin,
+            'title' => $plan->title,
+            'progress' => $progressPayload,
         ]));
     }
 
@@ -100,19 +135,22 @@ class DashboardController extends Controller
         ExerciseProgressService $exerciseProgressService
     ) {
         $validated = $request->validate([
-            'recommendation_id' => 'required|integer|exists:ai_recommendations,id',
+            'plan_id' => 'required|integer|exists:exercise_plans,id',
             'completed_task_keys' => 'sometimes|array',
             'completed_task_keys.*' => 'string|max:120',
             'review_feeling' => 'sometimes|nullable|string|in:lighter,steadier,hopeful,still_heavy,energized',
             'review_text' => 'sometimes|nullable|string|max:1000',
         ]);
 
-        $recommendation = AiRecommendation::where('id', $validated['recommendation_id'])
-            ->where('user_id', $request->user()->id)
-            ->where('rec_type', 'exercise')
-            ->firstOrFail();
+        $user = $request->user();
+        $plan = ExercisePlan::findOrFail($validated['plan_id']);
 
-        $exercisePayload = $exerciseService->normalizeStoredPayload($recommendation->content_json);
+        // Allow access to shared templates (user_id=null) and own plans
+        if ($plan->user_id !== null && $plan->user_id !== $user->id) {
+            abort(403, 'Access denied.');
+        }
+
+        $payload = $plan->content_json;
         $input = [];
 
         if ($request->exists('completed_task_keys')) {
@@ -128,9 +166,9 @@ class DashboardController extends Controller
         }
 
         $progress = $exerciseProgressService->updateProgress(
-            $request->user(),
-            $recommendation,
-            $exercisePayload,
+            $user,
+            $plan,
+            $payload,
             $input,
             $exerciseService->badgeTrack()
         );
@@ -139,6 +177,48 @@ class DashboardController extends Controller
             'message' => 'Exercise progress updated.',
             'progress' => $progress,
         ]);
+    }
+
+    public function startExercisePlan(
+        Request $request,
+        ExerciseService $exerciseService,
+        ExerciseProgressService $exerciseProgressService
+    ) {
+        $validated = $request->validate([
+            'plan_id' => 'required|integer|exists:exercise_plans,id',
+        ]);
+
+        $user = $request->user();
+        $plan = ExercisePlan::findOrFail($validated['plan_id']);
+
+        // Only shared templates can be started by any user
+        if ($plan->user_id !== null) {
+            return response()->json(['message' => 'Plan not available.'], 403);
+        }
+
+        // Create or get existing progress
+        $progress = \App\Models\ExerciseProgress::firstOrCreate(
+            ['user_id' => $user->id, 'exercise_plan_id' => $plan->id],
+            [
+                'completed_task_keys' => '[]',
+                'completed_chapter_keys' => '[]',
+                'completion_percentage' => 0,
+            ]
+        );
+
+        $payload = $plan->content_json;
+        $progressPayload = $exerciseProgressService->buildProgressPayload(
+            $progress,
+            $payload,
+            $exerciseService->badgeTrack()
+        );
+
+        return response()->json(array_merge($payload, [
+            'plan_id' => $plan->id,
+            'origin' => $plan->origin,
+            'progress' => $progressPayload,
+            'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
+        ]));
     }
 
     public function remix(Request $request, MatchingService $matchingService)
@@ -243,6 +323,7 @@ class DashboardController extends Controller
                 'status' => $nextBooking->status,
                 'scheduled_start' => $nextBooking->scheduled_start->toIso8601String(),
                 'scheduled_end' => $nextBooking->scheduled_end->toIso8601String(),
+                'jitsi_room_uuid' => $nextBooking->jitsi_room_uuid,
                 'consultant' => [
                     'name' => trim(
                         ($nextBooking->consultant->user->first_name ?? '') . ' ' .

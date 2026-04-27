@@ -95,13 +95,16 @@ class BookingFlowController extends Controller
         }
 
         return DB::transaction(function () use ($user, $consultant, $matchingSlot, $start, $end, $request) {
+            $durationHours = $start->diffInMinutes($end) / 60;
+            $totalAmount = round($consultant->base_rate_bdt * $durationHours);
+
             $booking = Booking::create([
                 'patient_id' => $user->id,
                 'consultant_id' => $consultant->user_id,
                 'slot_id' => $matchingSlot->id,
                 'status' => 'booked',
                 'jitsi_room_uuid' => Str::uuid(),
-                'price_at_booking' => $consultant->base_rate_bdt,
+                'price_at_booking' => $totalAmount,
                 'scheduled_start' => $start,
                 'scheduled_end' => $end,
             ]);
@@ -113,10 +116,7 @@ class BookingFlowController extends Controller
 
                 $booking->update(['status' => 'confirmed']);
 
-                $consultant->increment('balance_bdt', $consultant->base_rate_bdt);
-
-                $plan = $consultant->user->subscriptionPlan;
-                $feePct = $plan?->getFeature('platform_fee_percentage', 10);
+                $consultant->increment('balance_bdt', $totalAmount);
 
                 Transaction::create([
                     'booking_id' => $booking->id,
@@ -125,7 +125,7 @@ class BookingFlowController extends Controller
                     'status' => 'succeeded',
                     'total_amount' => 0,
                     'platform_fee' => 0,
-                    'consultant_net' => $consultant->base_rate_bdt,
+                    'consultant_net' => $totalAmount,
                     'currency' => 'BDT',
                 ]);
 
@@ -138,7 +138,7 @@ class BookingFlowController extends Controller
 
             $session = $this->stripe->createBookingCheckoutSession(
                 $user,
-                $consultant->base_rate_bdt,
+                $totalAmount,
                 $booking,
                 $request->input('success_url', url('/dashboard/booking/' . $consultant->user_id . '?session_id={CHECKOUT_SESSION_ID}&booking_id=' . $booking->id)),
                 $request->input('cancel_url', url('/dashboard/booking/' . $consultant->user_id))
@@ -204,6 +204,74 @@ class BookingFlowController extends Controller
                 'scheduled_start' => $booking->scheduled_start->toISOString(),
                 'scheduled_end' => $booking->scheduled_end->toISOString(),
                 'status' => 'confirmed',
+            ],
+        ]);
+    }
+
+    public function myBookings(Request $request)
+    {
+        $validated = $request->validate([
+            'status' => 'nullable|string|in:booked,pending,confirmed,cancelled,completed',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
+        $user = $request->user();
+        $role = $user->system_role;
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
+        $query = Booking::query();
+
+        if ($role === 'consultant') {
+            $query->where('consultant_id', $user->id);
+        } else {
+            $query->where('patient_id', $user->id);
+        }
+
+        if (!empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        $bookings = $query
+            ->with([
+                'consultant.user:id,first_name,last_name',
+                'patient:id,first_name,last_name',
+            ])
+            ->orderBy('scheduled_start', 'desc')
+            ->paginate(20, ['*'], 'page', $page);
+
+        return response()->json([
+            'bookings' => $bookings->getCollection()->map(function (Booking $b) use ($role) {
+                $isPatient = $role !== 'consultant';
+                $patient = $b->patient;
+                $patientRef = $patient
+                    ? '#' . strtoupper(substr(md5((string) $patient->id), 0, 6))
+                    : '#UNKNOWN';
+
+                return [
+                    'id' => $b->id,
+                    'ref' => $isPatient
+                        ? trim(($b->consultant?->user->first_name ?? '') . ' ' . ($b->consultant?->user->last_name ?? ''))
+                        : $patientRef,
+                    'subtitle' => $isPatient
+                        ? ($b->consultant?->specialization ?? '')
+                        : $patientRef,
+                    'status' => $b->status,
+                    'scheduled_start' => $b->scheduled_start?->toISOString(),
+                    'scheduled_end' => $b->scheduled_end?->toISOString(),
+                    'price_at_booking' => (float) $b->price_at_booking,
+                    'jitsi_room_uuid' => $b->jitsi_room_uuid,
+                    'is_first_time' => $isPatient ? false : Booking::query()
+                        ->where('patient_id', $b->patient_id)
+                        ->where('consultant_id', $b->consultant_id)
+                        ->where('id', '<', $b->id)
+                        ->doesntExist(),
+                ];
+            })->values(),
+            'meta' => [
+                'total' => $bookings->total(),
+                'per_page' => $bookings->perPage(),
+                'current_page' => $bookings->currentPage(),
+                'last_page' => $bookings->lastPage(),
             ],
         ]);
     }

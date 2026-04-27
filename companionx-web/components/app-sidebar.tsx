@@ -13,6 +13,7 @@ import {
   Gear,
   Sparkle,
   Wallet,
+  Clock,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -31,7 +32,8 @@ import { fetchCurrentUser, logout, type AuthUser } from "@/lib/auth";
 
 const patientNav = [
   { title: "Dashboard", href: "/dashboard", icon: House },
-  { title: "Booking", href: "/dashboard/booking", icon: CalendarBlank },
+  { title: "Book Session", href: "/dashboard/booking", icon: CalendarBlank },
+  { title: "My Sessions", href: "/dashboard/bookings", icon: Clock },
   { title: "Journal", href: "/dashboard/journal", icon: BookOpen },
   { title: "Exercises", href: "/dashboard/exercises", icon: Brain },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
@@ -78,7 +80,7 @@ export function AppSidebar() {
                   CompanionX
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  {isConsultant ? "Consultant" : "Patient Portal"}
+                  {isConsultant ? "Consultant Portal" : "User Portal"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -97,7 +99,7 @@ export function AppSidebar() {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== "/dashboard" &&
-                    pathname.startsWith(item.href));
+                    pathname.startsWith(item.href + "/"));
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -105,6 +107,7 @@ export function AppSidebar() {
                       render={<Link href={item.href} />}
                       isActive={isActive}
                       tooltip={item.title}
+                      className={isActive ? "!bg-primary/10 !text-primary !font-medium" : ""}
                     >
                       <item.icon weight={isActive ? "bold" : "regular"} />
                       <span>{item.title}</span>
@@ -123,7 +126,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
+            <SidebarMenuButton size="lg" render={<Link href="/dashboard/profile" />}>
               <div className="flex aspect-square size-8 items-center justify-center border border-border bg-muted font-sans text-xs font-bold text-muted-foreground">
                 {avatarLabel}
               </div>
@@ -134,7 +137,7 @@ export function AppSidebar() {
                     : "Loading..."}
                 </span>
                 <span className="truncate text-[11px] text-muted-foreground">
-                  {user?.system_role ?? ""}
+                  {user?.subscription_plan?.name ?? "Free"} &middot; {user?.system_role === "consultant" ? "Consultant" : "User"}
                 </span>
               </div>
             </SidebarMenuButton>

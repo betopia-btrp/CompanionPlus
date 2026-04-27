@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\AiRecommendation;
 use App\Models\ExerciseProgress;
+use App\Models\ExercisePlan;
 use App\Models\MoodJournal;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -46,14 +46,14 @@ class ExerciseProgressService
 
     public function updateProgress(
         User $user,
-        AiRecommendation $recommendation,
+        ExercisePlan $plan,
         array $exercisePayload,
         array $input,
         array $badgeTrack
     ): array {
         $progress = ExerciseProgress::firstOrNew([
             'user_id' => $user->id,
-            'recommendation_id' => $recommendation->id,
+            'exercise_plan_id' => $plan->id,
         ]);
 
         $chapters = collect(data_get($exercisePayload, 'chapters', []));

@@ -21,10 +21,13 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::get("/user", function (Request $request) {
         return $request->user();
     });
+    Route::get("/profile", [App\Http\Controllers\Api\ProfileController::class, "show"]);
+    Route::patch("/profile", [App\Http\Controllers\Api\ProfileController::class, "update"]);
 
     Route::get("/subscription/plans", [SubscriptionController::class, "index"]);
     Route::post("/subscription/checkout", [SubscriptionController::class, "checkout"]);
     Route::post("/subscription/complete", [SubscriptionController::class, "complete"]);
+    Route::get("/bookings", [BookingFlowController::class, "myBookings"]);
 
     Route::middleware("patient")->group(function () {
         Route::post("/onboarding", [OnboardingController::class, "store"]);
@@ -45,8 +48,8 @@ Route::middleware("auth:sanctum")->group(function () {
             BookingFlowController::class,
             "release",
         ]);
-        Route::post("/bookings/checkout", [BookingFlowController::class, "checkout"]);
-        Route::post("/bookings/complete", [BookingFlowController::class, "complete"]);
+    Route::post("/bookings/checkout", [BookingFlowController::class, "checkout"]);
+    Route::post("/bookings/complete", [BookingFlowController::class, "complete"]);
         Route::get("/dashboard/recommendations", [
             DashboardController::class,
             "getRecommendations",
@@ -58,6 +61,14 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::patch("/dashboard/exercises/progress", [
             DashboardController::class,
             "updateExerciseProgress",
+        ]);
+        Route::get("/exercise-plans/{planId}", [
+            DashboardController::class,
+            "getExercisePlan",
+        ]);
+        Route::post("/exercise-plans/start", [
+            DashboardController::class,
+            "startExercisePlan",
         ]);
         Route::get("/dashboard/remix", [DashboardController::class, "remix"]);
 

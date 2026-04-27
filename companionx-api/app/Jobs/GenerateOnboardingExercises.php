@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\AiRecommendation;
+use App\Models\ExercisePlan;
 use App\Services\ExerciseService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,23 +27,27 @@ class GenerateOnboardingExercises implements ShouldQueue
     public function handle(ExerciseService $exerciseService): void
     {
         try {
-            $exercisePlan = $exerciseService->generateForOnboarding($this->userId);
+            $user = \App\Models\User::find($this->userId);
 
-            AiRecommendation::updateOrCreate(
-                [
-                    'user_id' => $this->userId,
-                    'source_journal_id' => null,
-                    'rec_type' => 'exercise',
-                ],
-                [
-                    'content_json' => $exercisePlan,
-                ]
-            );
+            if (!$user || !$user->canAccessAiExercises()) {
+                return;
+            }
+
+            $exercisePlan = $exerciseService->generateForOnboarding($this->userId);
+            $title = data_get($exercisePlan, 'journey.headline', 'Grounded Start Quest');
+
+            ExercisePlan::create([
+                'user_id' => $this->userId,
+                'origin' => 'ai',
+                'title' => $title,
+                'description' => data_get($exercisePlan, 'journey.motivation', ''),
+                'estimated_time' => null,
+                'content_json' => $exercisePlan,
+            ]);
         } catch (\Throwable $exception) {
             Log::error('GenerateOnboardingExercises failed: ' . $exception->getMessage(), [
                 'user_id' => $this->userId,
             ]);
-
             throw $exception;
         }
     }

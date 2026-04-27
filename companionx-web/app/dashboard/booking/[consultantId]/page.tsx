@@ -249,7 +249,7 @@ export default function ConsultantBookingPage() {
                 ৳{c.base_rate_bdt}
               </p>
               <p className="font-sans text-xs text-muted-foreground">
-                /session
+                /hr
               </p>
             </div>
           </div>
@@ -332,6 +332,13 @@ export default function ConsultantBookingPage() {
                     {formatTime(selection.start)} &ndash;{" "}
                     {formatTime(selection.end)}
                   </p>
+                  <p className="mt-1 font-sans text-xs text-muted-foreground">
+                    {(selection.end.getTime() - selection.start.getTime()) / 3600000} hr
+                    {Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60 > 0
+                      ? ` ${Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60} min`
+                      : ""}
+                    {" "}× ৳{c.base_rate_bdt}/hr
+                  </p>
                 </div>
 
                 <div className="border-t border-border pt-4">
@@ -340,7 +347,7 @@ export default function ConsultantBookingPage() {
                       Session Fee
                     </span>
                     <span className="font-heading text-lg font-semibold text-foreground">
-                      ৳{c.base_rate_bdt}
+                      ৳{Math.round(c.base_rate_bdt * (selection.end.getTime() - selection.start.getTime()) / 3600000)}
                     </span>
                   </div>
                 </div>
