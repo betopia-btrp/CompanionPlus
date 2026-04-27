@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ConsultantController;
 use App\Http\Controllers\Api\ExerciseController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\SessionNoteController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StripeWebhookController;
@@ -236,6 +237,19 @@ Route::middleware("auth:sanctum")->group(function () {
             BlogController::class,
             "destroy",
         ]);
+    });
+
+    Route::middleware("admin")->prefix("admin")->group(function () {
+        Route::get("/summary", [AdminController::class, "summary"]);
+        Route::get("/users", [AdminController::class, "users"]);
+        Route::get("/consultants", [AdminController::class, "consultants"]);
+        Route::patch("/consultants/{consultantId}/approval", [AdminController::class, "updateConsultantApproval"]);
+        Route::get("/bookings", [AdminController::class, "bookings"]);
+        Route::get("/safety-alerts", [AdminController::class, "safetyAlerts"]);
+        Route::patch("/safety-alerts/{alertId}", [AdminController::class, "updateSafetyAlert"]);
+        Route::get("/blogs", [AdminController::class, "blogs"]);
+        Route::patch("/blogs/{postId}", [AdminController::class, "updateBlog"]);
+        Route::delete("/blogs/{postId}", [AdminController::class, "deleteBlog"]);
     });
 
     // Blog routes (authenticated users - patients and consultants)

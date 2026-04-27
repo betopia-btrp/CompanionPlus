@@ -156,6 +156,12 @@ export default function DashboardPage() {
           return;
         }
 
+        if (currentUser.system_role === "admin") {
+          router.replace("/dashboard/admin");
+          setLoading(false);
+          return;
+        }
+
         api
           .get("/api/dashboard/summary")
           .then((res) => {

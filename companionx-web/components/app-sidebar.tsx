@@ -10,11 +10,16 @@ import {
   Brain,
   VideoCamera,
   SignOut,
-  Gear,
   Sparkle,
   Wallet,
   Clock,
   Article,
+  ShieldCheck,
+  UsersThree,
+  Stethoscope,
+  BellRinging,
+  CalendarCheck,
+  Newspaper,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -50,6 +55,15 @@ const consultantNav = [
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
 
+const adminNav = [
+  { title: "Overview", href: "/dashboard/admin", icon: ShieldCheck },
+  { title: "Users", href: "/dashboard/admin/users", icon: UsersThree },
+  { title: "Consultants", href: "/dashboard/admin/consultants", icon: Stethoscope },
+  { title: "Sessions", href: "/dashboard/admin/sessions", icon: CalendarCheck },
+  { title: "Safety Alerts", href: "/dashboard/admin/safety", icon: BellRinging },
+  { title: "Content", href: "/dashboard/admin/content", icon: Newspaper },
+];
+
 export function AppSidebar() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const pathname = usePathname();
@@ -59,7 +73,8 @@ export function AppSidebar() {
   }, []);
 
   const isConsultant = user?.system_role === "consultant";
-  const nav = isConsultant ? consultantNav : patientNav;
+  const isAdmin = user?.system_role === "admin";
+  const nav = isAdmin ? adminNav : isConsultant ? consultantNav : patientNav;
 
   const avatarLabel =
     `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.trim() || "U";
@@ -83,7 +98,7 @@ export function AppSidebar() {
                   CompanionX
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  {isConsultant ? "Consultant Portal" : "User Portal"}
+                  {isAdmin ? "Admin Console" : isConsultant ? "Consultant Portal" : "User Portal"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -140,7 +155,7 @@ export function AppSidebar() {
                     : "Loading..."}
                 </span>
                 <span className="truncate text-[11px] text-muted-foreground">
-                  {user?.subscription_plan?.name ?? "Free"} &middot; {user?.system_role === "consultant" ? "Consultant" : "User"}
+                  {user?.subscription_plan?.name ?? "Free"} &middot; {isAdmin ? "Admin" : isConsultant ? "Consultant" : "User"}
                 </span>
               </div>
             </SidebarMenuButton>
