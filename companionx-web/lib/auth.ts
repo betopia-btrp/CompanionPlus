@@ -15,6 +15,7 @@ export type AuthUser = {
   } | null;
   active_subscription?: boolean;
   free_sessions_remaining?: number;
+  subscription_end_date?: string | null;
 };
 
 export type LoginPayload = {

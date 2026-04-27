@@ -11,12 +11,12 @@ class Booking extends Model
     protected $fillable = [
         'patient_id',
         'consultant_id',
-        'slot_id',
         'status',
         'jitsi_room_uuid',
         'price_at_booking',
         'scheduled_start',
         'scheduled_end',
+        'stripe_session_id',
     ];
 
     protected function casts(): array
@@ -38,11 +38,6 @@ class Booking extends Model
     public function patient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'patient_id');
-    }
-
-    public function slot(): BelongsTo
-    {
-        return $this->belongsTo(AvailabilitySlot::class, 'slot_id');
     }
 
     public function transactions()

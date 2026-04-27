@@ -5,21 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AvailabilityTemplate extends Model
+class AvailabilityOverride extends Model
 {
     protected $fillable = [
         'consultant_id',
-        'day_of_week',
-        'start_time',
-        'end_time',
+        'start_datetime',
+        'end_datetime',
+        'type',
+        'reason',
     ];
 
     protected function casts(): array
     {
         return [
-            'day_of_week' => 'integer',
-            'start_time' => 'datetime:H:i',
-            'end_time' => 'datetime:H:i',
+            'start_datetime' => 'datetime',
+            'end_datetime' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

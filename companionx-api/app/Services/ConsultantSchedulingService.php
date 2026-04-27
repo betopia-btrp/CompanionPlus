@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AvailabilitySlot;
 use App\Models\Booking;
 use App\Models\ConsultantProfile;
 use App\Models\Transaction;
@@ -35,9 +34,7 @@ class ConsultantSchedulingService
     {
         $this->bookingService->cancelExpiredBookings();
 
-        $profile = $this->ensureConsultantProfile($user)->load([
-            'availabilitySlots' => fn ($query) => $query->active()->orderBy('start_datetime'),
-        ]);
+        $profile = $this->ensureConsultantProfile($user);
 
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
@@ -45,7 +42,7 @@ class ConsultantSchedulingService
         $todayBookings = Booking::query()
             ->where('consultant_id', $profile->user_id)
             ->whereDate('scheduled_start', $today)
-            ->with(['patient', 'slot'])
+            ->with('patient')
             ->orderBy('scheduled_start')
             ->get();
 
@@ -57,7 +54,7 @@ class ConsultantSchedulingService
         $pendingBookings = Booking::query()
             ->where('consultant_id', $profile->user_id)
             ->where('status', 'pending')
-            ->with(['patient', 'slot'])
+            ->with('patient')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -80,25 +77,11 @@ class ConsultantSchedulingService
             ? round((($monthlyEarnings - $lastMonthEarnings) / $lastMonthEarnings) * 100, 1)
             : 0;
 
-        $upcomingSlots = $profile->availabilitySlots()
-            ->where('start_datetime', '>', now())
-            ->with('activeBooking')
-            ->get();
-
-        $bookedCount = 0;
-        $heldCount = 0;
-        $availableCount = 0;
-
-        foreach ($upcomingSlots as $slot) {
-            $ab = $slot->activeBooking;
-            if (!$ab) {
-                $availableCount++;
-            } elseif ($ab->status === 'booked' && $ab->hasActiveHold()) {
-                $heldCount++;
-            } else {
-                $bookedCount++;
-            }
-        }
+        $templateCount = \App\Models\AvailabilityTemplate::where('consultant_id', $profile->user_id)->count();
+        $bookingsCount = Booking::where('consultant_id', $profile->user_id)
+            ->whereIn('status', ['booked', 'pending', 'confirmed'])
+            ->where('scheduled_start', '>', now())
+            ->count();
 
         return [
             'consultant' => [
@@ -115,10 +98,10 @@ class ConsultantSchedulingService
                 'today_sessions' => $todayBookings->count(),
                 'total_patients' => $totalPatients,
                 'pending_bookings' => $pendingBookings->count(),
-                'upcoming_slots' => $upcomingSlots->count(),
-                'booked_slots' => $bookedCount,
-                'held_slots' => $heldCount,
-                'available_slots' => $availableCount,
+                'upcoming_slots' => 0,
+                'booked_slots' => 0,
+                'held_slots' => 0,
+                'available_slots' => 0,
             ],
             'today_schedule' => $todayBookings->map(fn (Booking $b) => $this->serializeBooking($b))->values()->all(),
             'earnings' => [
@@ -126,10 +109,7 @@ class ConsultantSchedulingService
                 'change_percent' => $earningsChange,
             ],
             'session_requests' => $pendingBookings->map(fn (Booking $b) => $this->serializeBooking($b))->values()->all(),
-            'slots' => $upcomingSlots
-                ->map(fn (AvailabilitySlot $slot) => $this->serializeSlot($slot))
-                ->values()
-                ->all(),
+            'slots' => [],
         ];
     }
 

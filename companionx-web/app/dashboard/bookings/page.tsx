@@ -11,6 +11,7 @@ import {
   ArrowRight,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type Booking = {
   id: number;
@@ -21,6 +22,7 @@ type Booking = {
   scheduled_end: string;
   price_at_booking: number;
   jitsi_room_uuid: string;
+  stripe_session_id: string | null;
   is_first_time: boolean;
 };
 
@@ -32,6 +34,7 @@ type Meta = {
 };
 
 const TABS = [
+  { key: "booked", label: "Payment" },
   { key: "pending", label: "Pending" },
   { key: "confirmed", label: "Upcoming" },
   { key: "completed", label: "Past" },
@@ -73,7 +76,7 @@ function getStatusStyle(status: string) {
     case "cancelled":
       return "border-border text-muted-foreground bg-muted/30";
     case "booked":
-      return "border-primary/40 text-primary bg-primary/10";
+      return "border-amber-500/40 text-amber-700 bg-amber-500/10";
     default:
       return "border-border text-muted-foreground bg-muted/30";
   }
@@ -86,6 +89,7 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState<number | null>(null);
   const [isConsultant, setIsConsultant] = useState(false);
   const router = useRouter();
 
@@ -141,6 +145,26 @@ export default function BookingsPage() {
     }
   };
 
+  const handleVerifyPayment = async (booking: Booking) => {
+    setVerifyLoading(booking.id);
+    try {
+      if (!booking.stripe_session_id) {
+        toast.error("No payment session found. Please contact support.");
+        return;
+      }
+      await api.post("/api/bookings/complete", {
+        session_id: booking.stripe_session_id,
+        booking_id: booking.id,
+      });
+      toast.success("Payment verified! Session confirmed.");
+      await fetchBookings();
+    } catch {
+      toast.error("Payment verification failed. Contact support.");
+    } finally {
+      setVerifyLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
@@ -184,12 +208,14 @@ export default function BookingsPage() {
             <p className="font-heading text-sm font-medium text-foreground">
               No {activeTab} bookings
             </p>
-            <p className="mt-1 font-sans text-xs text-muted-foreground">
-              {activeTab === "pending"
-                ? "New session requests will appear here."
-                : activeTab === "confirmed"
-                  ? "Upcoming confirmed sessions will appear here."
-                  : "Past sessions will appear here."}
+              <p className="mt-1 font-sans text-xs text-muted-foreground">
+                {activeTab === "booked"
+                  ? "Bookings awaiting payment confirmation will appear here."
+                  : activeTab === "pending"
+                    ? "New session requests will appear here."
+                    : activeTab === "confirmed"
+                      ? "Upcoming confirmed sessions will appear here."
+                      : "Past sessions will appear here."}
             </p>
           </div>
         ) : (
@@ -252,6 +278,16 @@ export default function BookingsPage() {
                         Approve
                       </Button>
                     </>
+                  )}
+                  {booking.status === "booked" && (
+                    <Button
+                      size="sm"
+                      className="text-xs font-medium"
+                      onClick={() => handleVerifyPayment(booking)}
+                      disabled={verifyLoading === booking.id}
+                    >
+                      {verifyLoading === booking.id ? "Verifying..." : "Verify Payment"}
+                    </Button>
                   )}
                   {booking.status === "confirmed" && (
                     <Button
