@@ -11,6 +11,38 @@ use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\ConsultantController;
 use App\Http\Controllers\Api\ExerciseController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\BlogController;
+
+Route::get('/debug/blog-model', function () {
+    try {
+        $count = \App\Models\BlogPost::count();
+        return ['status' => 'ok', 'count' => $count];
+    } catch (\Exception $e) {
+        return ['status' => 'error', 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()];
+    }
+});
+
+Route::get('/debug/test', function () {
+    try {
+        $posts = \App\Models\BlogPost::where('author_id', 1)->get();
+        return ['status' => 'ok', 'count' => $posts->count(), 'sql' => \App\Models\BlogPost::where('author_id', 1)->toSql()];
+    } catch (\Exception $e) {
+        return ['status' => 'error', 'message' => $e->getMessage(), 'line' => $e->getLine(), 'file' => $e->getFile()];
+    }
+});
+
+Route::get('/debug/test-auth', function (\Illuminate\Http\Request $request) {
+    try {
+        $user = $request->user();
+        if (!$user) {
+            return ['status' => 'error', 'message' => 'Not authenticated'];
+        }
+        $posts = \App\Models\BlogPost::where('author_id', $user->id)->get();
+        return ['status' => 'ok', 'user_id' => $user->id, 'count' => $posts->count(), 'name' => $user->first_name];
+    } catch (\Exception $e) {
+        return ['status' => 'error', 'message' => $e->getMessage(), 'line' => $e->getLine(), 'file' => $e->getFile()];
+    }
+});
 
 Route::post("/register", [AuthController::class, "register"]);
 Route::post("/login", [AuthController::class, "login"]);
@@ -139,5 +171,17 @@ Route::middleware("auth:sanctum")->group(function () {
             ConsultantDashboardController::class,
             "wallet",
         ]);
+
+        // Consultant's Corner - Blog posts
+        Route::get("/consultant/blogs/drafts", [BlogController::class, "drafts"]);
+        Route::post("/consultant/blogs", [BlogController::class, "store"]);
+        Route::put("/consultant/blogs/{id}", [BlogController::class, "update"]);
+        Route::delete("/consultant/blogs/{id}", [BlogController::class, "destroy"]);
     });
+
+    // Blog routes (authenticated users - patients and consultants)
+    Route::get("/blogs", [BlogController::class, "index"]);
+    Route::get("/blogs/{slug}", [BlogController::class, "show"]);
+    Route::post("/blogs/{id}/react", [BlogController::class, "react"]);
+    Route::delete("/blogs/{id}/react", [BlogController::class, "unreact"]);
 });
