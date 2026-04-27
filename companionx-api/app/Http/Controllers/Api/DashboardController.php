@@ -7,14 +7,17 @@ use App\Models\AiRecommendation;
 use App\Models\Booking;
 use App\Models\ConsultantProfile;
 use App\Models\ExercisePlan;
+use App\Models\User;
 use App\Services\ExerciseProgressService;
 use App\Services\ExerciseService;
 use App\Services\MatchingService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class DashboardController extends Controller
 {
+    use AuthorizesRequests;
     public function getRecommendations(Request $request)
     {
         $user = $request->user();
@@ -86,7 +89,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'plans' => $plans,
-            'can_access_ai' => $user->canAccessAiExercises(),
+            'can_access_ai' => $user->can('aiExercises', User::class),
             'mood_tracker' => $exerciseProgressService->buildMoodTracker($user->id),
         ]);
     }
@@ -101,9 +104,7 @@ class DashboardController extends Controller
 
         $plan = ExercisePlan::findOrFail($planId);
 
-        if ($plan->user_id !== null && $plan->user_id !== $user->id) {
-            abort(403, 'Access denied.');
-        }
+        $this->authorize('view', $plan);
 
         $progress = \App\Models\ExerciseProgress::firstOrCreate(
             ['user_id' => $user->id, 'exercise_plan_id' => $plan->id],
@@ -145,10 +146,7 @@ class DashboardController extends Controller
         $user = $request->user();
         $plan = ExercisePlan::findOrFail($validated['plan_id']);
 
-        // Allow access to shared templates (user_id=null) and own plans
-        if ($plan->user_id !== null && $plan->user_id !== $user->id) {
-            abort(403, 'Access denied.');
-        }
+        $this->authorize('track', $plan);
 
         $payload = $plan->content_json;
         $input = [];
@@ -191,10 +189,7 @@ class DashboardController extends Controller
         $user = $request->user();
         $plan = ExercisePlan::findOrFail($validated['plan_id']);
 
-        // Only shared templates can be started by any user
-        if ($plan->user_id !== null) {
-            return response()->json(['message' => 'Plan not available.'], 403);
-        }
+        $this->authorize('view', $plan);
 
         // Create or get existing progress
         $progress = \App\Models\ExerciseProgress::firstOrCreate(
@@ -296,24 +291,24 @@ class DashboardController extends Controller
             ->orderBy('scheduled_start')
             ->first();
 
-        $exercise = AiRecommendation::where('user_id', $user->id)
-            ->where('rec_type', 'exercise')
+        $progress = \App\Models\ExerciseProgress::where('user_id', $user->id)
             ->latest()
             ->first();
 
         $moodTracker = $exerciseProgressService->buildMoodTracker($user->id);
 
         $exerciseData = null;
-        if ($exercise) {
-            $exercisePayload = $exerciseService->normalizeStoredPayload($exercise->content_json);
-            $progress = $exerciseProgressService->buildProgressPayload(
-                $exercise->exerciseProgress,
-                $exercisePayload,
+        if ($progress && $progress->plan) {
+            $plan = $progress->plan;
+            $payload = $plan->content_json;
+            $progressPayload = $exerciseProgressService->buildProgressPayload(
+                $progress,
+                $payload,
                 $exerciseService->badgeTrack()
             );
-            $exerciseData = array_merge($exercisePayload, [
-                'recommendation_id' => $exercise->id,
-                'progress' => $progress,
+            $exerciseData = array_merge($payload, [
+                'plan_id' => $plan->id,
+                'progress' => $progressPayload,
             ]);
         }
 

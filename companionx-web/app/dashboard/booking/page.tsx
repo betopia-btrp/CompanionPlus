@@ -345,7 +345,7 @@ function ConsultantCard({
           </div>
           <div className="flex items-center gap-1 font-sans text-xs text-muted-foreground">
             <Star size={12} weight="fill" className="text-amber-500" />
-            {consultant.average_rating || "5.0"}
+            {consultant.average_rating ?? "—"}
           </div>
         </div>
       </div>

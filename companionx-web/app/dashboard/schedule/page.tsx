@@ -73,6 +73,9 @@ type RBCEvent = {
     slotId?: number;
     bookingId?: number;
     jitsiRoomUuid?: string;
+    sourceTemplateId?: number | null;
+    patientName?: string;
+    patientRef?: string;
   };
 };
 
@@ -118,11 +121,8 @@ export default function SchedulePage() {
   });
   const [creating, setCreating] = useState(false);
 
-  // Selected event popover
+  // Selected event dialog
   const [selectedEvent, setSelectedEvent] = useState<RBCEvent | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
-    null,
-  );
 
   // Template modal
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -190,6 +190,7 @@ export default function SchedulePage() {
         type: "slot" as const,
         status: slot.status,
         slotId: slot.id,
+        sourceTemplateId: slot.source_template_id,
       },
     }));
 
@@ -203,6 +204,8 @@ export default function SchedulePage() {
         status: b.status,
         bookingId: b.id,
         jitsiRoomUuid: b.jitsi_room_uuid,
+        patientName: b.patient_name,
+        patientRef: b.patient_ref,
       },
     }));
 
@@ -218,6 +221,28 @@ export default function SchedulePage() {
       };
     }
 
+    // Template-generated slot
+    if (event.resource.sourceTemplateId) {
+      switch (event.resource.status) {
+        case "available":
+          return {
+            className:
+              "!bg-sky-500/10 !border-sky-500/40 !text-sky-700 !border !border-dashed !rounded-none !text-xs",
+          };
+        case "held":
+          return {
+            className:
+              "!bg-amber-500/15 !border-amber-500/40 !text-amber-700 !border !border-dashed !rounded-none !text-xs",
+          };
+        default:
+          return {
+            className:
+              "!bg-sky-500/10 !border-sky-500/40 !text-sky-700 !border !border-dashed !rounded-none !text-xs",
+          };
+      }
+    }
+
+    // Manual slot
     switch (event.resource.status) {
       case "available":
         return {
@@ -266,10 +291,8 @@ export default function SchedulePage() {
   );
 
   const handleSelectEvent = useCallback(
-    (event: RBCEvent, e: React.SyntheticEvent) => {
-      const nativeEvent = e as React.MouseEvent;
+    (event: RBCEvent) => {
       setSelectedEvent(event);
-      setPopoverPos({ x: nativeEvent.clientX, y: nativeEvent.clientY });
     },
     [],
   );
@@ -353,7 +376,6 @@ export default function SchedulePage() {
       try {
         const res = await api.delete(`/api/consultant/slots/${slotId}`);
         setSelectedEvent(null);
-        setPopoverPos(null);
         setStatusMessage(res.data.message || "Slot removed.");
         await fetchSchedule();
       } catch (error: any) {
@@ -419,16 +441,6 @@ export default function SchedulePage() {
     [fetchSchedule],
   );
 
-  // Close popover on outside click
-  useEffect(() => {
-    if (!popoverPos) return;
-    const handler = () => {
-      setPopoverPos(null);
-      setSelectedEvent(null);
-    };
-    window.addEventListener("click", handler);
-    return () => window.removeEventListener("click", handler);
-  }, [popoverPos]);
 
   // Custom event component
   const EventComponent = useCallback(({ event }: EventProps<RBCEvent>) => {
@@ -577,20 +589,24 @@ export default function SchedulePage() {
         </div>
 
         {/* ── Event Popover ───────────────────────────────────────── */}
-        {selectedEvent && popoverPos && (
+        {selectedEvent && (
           <div
-            className="fixed z-50 border border-border bg-card shadow-lg p-4 w-64"
-            style={{ left: popoverPos.x, top: popoverPos.y }}
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setSelectedEvent(null)}
           >
-            {selectedEvent.resource.type === "slot" && (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Clock size={14} weight="bold" className="text-emerald-600" />
-                    <span className="font-sans text-xs font-medium text-foreground">
-                      Availability Slot
-                    </span>
+            <div
+              className="w-full max-w-sm border border-border bg-card p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {selectedEvent.resource.type === "slot" ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Clock size={16} weight="bold" className={selectedEvent.resource.sourceTemplateId ? "text-sky-600" : "text-emerald-600"} />
+                      <span className="font-sans text-sm font-medium text-foreground">
+                        {selectedEvent.resource.sourceTemplateId ? "Template Slot" : "Manual Slot"}
+                      </span>
+                    </div>
                     <span
                       className={`font-sans text-[10px] font-medium uppercase tracking-wider border px-1.5 py-0.5 ${
                         selectedEvent.resource.status === "available"
@@ -601,74 +617,86 @@ export default function SchedulePage() {
                       {selectedEvent.resource.status}
                     </span>
                   </div>
-                  <button
-                    onClick={() =>
-                      handleDeleteSlot(selectedEvent.resource.slotId!)
-                    }
-                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                    title="Delete slot"
-                  >
-                    <Trash size={14} weight="bold" />
-                  </button>
-                </div>
-                <p className="font-sans text-xs text-muted-foreground mb-1">
-                  {format(selectedEvent.start, "EEE, MMM d")}
-                </p>
-                <p className="font-sans text-sm font-medium text-foreground mb-4">
-                  {formatTimeShort(selectedEvent.start)} –{" "}
-                  {formatTimeShort(selectedEvent.end)}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10"
-                  onClick={() =>
-                    handleDeleteSlot(selectedEvent.resource.slotId!)
-                  }
-                >
-                  <Trash size={12} weight="bold" />
-                  Delete Slot
-                </Button>
-              </>
-            )}
-            {selectedEvent.resource.type === "booking" && (
-              <>
-                <div className="flex items-center gap-2 mb-3">
-                  <VideoCamera
-                    size={14}
-                    weight="bold"
-                    className="text-primary"
-                  />
-                  <span className="font-sans text-xs font-medium text-foreground">
-                    Booking
-                  </span>
-                  <span className="ml-auto font-sans text-[10px] font-medium uppercase tracking-wider border border-primary/40 text-primary bg-primary/10 px-1.5 py-0.5">
-                    {selectedEvent.resource.status}
-                  </span>
-                </div>
-                <p className="font-sans text-xs text-muted-foreground mb-1">
-                  {format(selectedEvent.start, "EEE, MMM d")}
-                </p>
-                <p className="font-sans text-sm font-medium text-foreground mb-4">
-                  {formatTimeShort(selectedEvent.start)} –{" "}
-                  {formatTimeShort(selectedEvent.end)}
-                </p>
-                {selectedEvent.resource.status === "confirmed" && (
-                  <Button
-                    size="sm"
-                    className="w-full text-xs font-medium"
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/room?room=${selectedEvent.resource.jitsiRoomUuid}`,
-                      )
-                    }
-                  >
-                    <VideoCamera size={12} weight="bold" />
-                    Join Session
-                  </Button>
-                )}
-              </>
-            )}
+                  <p className="font-sans text-xs text-muted-foreground mb-1">
+                    {format(selectedEvent.start, "EEE, MMM d")}
+                  </p>
+                  <p className="font-sans text-sm font-medium text-foreground mb-5">
+                    {formatTimeShort(selectedEvent.start)} –{" "}
+                    {formatTimeShort(selectedEvent.end)}
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs font-medium"
+                      onClick={() => setSelectedEvent(null)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10"
+                      variant="outline"
+                      onClick={() => {
+                        handleDeleteSlot(selectedEvent.resource.slotId!);
+                        setSelectedEvent(null);
+                      }}
+                    >
+                      <Trash size={12} weight="bold" />
+                      Delete
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <VideoCamera size={16} weight="bold" className="text-primary" />
+                      <span className="font-sans text-sm font-medium text-foreground">
+                        Booking
+                      </span>
+                    </div>
+                    <span className="font-sans text-[10px] font-medium uppercase tracking-wider border border-primary/40 text-primary bg-primary/10 px-1.5 py-0.5">
+                      {selectedEvent.resource.status}
+                    </span>
+                  </div>
+                  <p className="font-sans text-sm font-medium text-foreground mb-1">
+                    {selectedEvent.resource.patientRef || "Patient"}
+                  </p>
+                  <p className="font-sans text-xs text-muted-foreground mb-1">
+                    {format(selectedEvent.start, "EEE, MMM d")}
+                  </p>
+                  <p className="font-sans text-sm text-foreground mb-5">
+                    {formatTimeShort(selectedEvent.start)} –{" "}
+                    {formatTimeShort(selectedEvent.end)}
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs font-medium"
+                      onClick={() => setSelectedEvent(null)}
+                    >
+                      Close
+                    </Button>
+                    {selectedEvent.resource.status === "confirmed" && (
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs font-medium"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/room?room=${selectedEvent.resource.jitsiRoomUuid}`,
+                          )
+                        }
+                      >
+                        <VideoCamera size={12} weight="bold" />
+                        Join
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 

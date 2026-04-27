@@ -17,6 +17,7 @@ class Booking extends Model
         'price_at_booking',
         'scheduled_start',
         'scheduled_end',
+        'stripe_session_id',
     ];
 
     protected function casts(): array
