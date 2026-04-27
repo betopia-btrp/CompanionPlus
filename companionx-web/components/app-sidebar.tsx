@@ -14,6 +14,7 @@ import {
   Sparkle,
   Wallet,
   Clock,
+  Article,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -36,6 +37,7 @@ const patientNav = [
   { title: "My Sessions", href: "/dashboard/bookings", icon: Clock },
   { title: "Journal", href: "/dashboard/journal", icon: BookOpen },
   { title: "Exercises", href: "/dashboard/exercises", icon: Brain },
+  { title: "Consultant's Corner", href: "/dashboard/corner", icon: Article },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
 
@@ -43,6 +45,7 @@ const consultantNav = [
   { title: "Dashboard", href: "/dashboard", icon: House },
   { title: "Schedule", href: "/dashboard/schedule", icon: CalendarBlank },
   { title: "Bookings", href: "/dashboard/bookings", icon: BookOpen },
+  { title: "Consultant's Corner", href: "/dashboard/consultant/corner", icon: Article },
   { title: "Earnings", href: "/dashboard/earnings", icon: Wallet },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
