@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Figtree, Lora, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 const lora = Lora({ subsets: ["latin"], variable: "--font-heading" });
@@ -33,6 +34,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <div className="w-full">{children}</div>
+        <Toaster richColors closeButton />
       </body>
     </html>
   );

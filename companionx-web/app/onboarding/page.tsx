@@ -145,8 +145,8 @@ export default function OnboardingPage() {
 
   const submitOnboarding = async () => {
     try {
+      await api.get("/sanctum/csrf-cookie");
       await api.post("/api/onboarding", { answers });
-      alert("Onboarding complete! Generating your recommendations...");
       router.push("/dashboard");
     } catch {
       alert("Error saving answers");

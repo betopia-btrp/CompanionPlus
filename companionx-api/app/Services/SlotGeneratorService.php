@@ -96,14 +96,13 @@ class SlotGeneratorService
 
     private function splitIntoSlots(int $consultantId, int $templateId, Carbon $date, $startTime, $endTime): array
     {
-        $start = $date->copy()->setTimeFromTimeString(
+        $start = $date->copy()->setTimezone('Asia/Dhaka')->setTimeFromTimeString(
             is_string($startTime) ? $startTime : $startTime->format('H:i:s')
-        );
-        $end = $date->copy()->setTimeFromTimeString(
+        )->setTimezone('UTC');
+        $end = $date->copy()->setTimezone('Asia/Dhaka')->setTimeFromTimeString(
             is_string($endTime) ? $endTime : $endTime->format('H:i:s')
-        );
+        )->setTimezone('UTC');
 
-        // Just create one slot for the entire block, not 30-min chunks
         return [[
             'consultant_id' => $consultantId,
             'source_template_id' => $templateId,

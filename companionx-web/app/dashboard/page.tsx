@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Brain,
+  CalendarDots,
+  CheckCircle,
   Crown,
   Spinner,
   TrendUp,
@@ -120,12 +122,7 @@ function getCategoryLabel(chapterKey: string): string {
   return map[chapterKey] ?? "EXERCISE";
 }
 
-// Placeholder images for exercise cards (gradient backgrounds)
-const exerciseImages = [
-  "bg-gradient-to-br from-slate-100 to-slate-200",
-  "bg-gradient-to-br from-slate-200 to-slate-300",
-  "bg-gradient-to-br from-slate-100 to-slate-300",
-];
+
 
 export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -214,10 +211,27 @@ export default function DashboardPage() {
 
   const appointment = data?.next_appointment;
   const hasMoodData = (data?.mood_tracker?.entries_count ?? 0) > 0;
-  const exercise = data?.exercise;
-  const chapters = exercise?.chapters ?? [];
-  const progress = exercise?.progress;
-  const completedKeys = new Set(progress?.completed_task_keys ?? []);
+
+  const [recentPlans, setRecentPlans] = useState<{
+    id: number;
+    title: string;
+    description: string | null;
+    estimated_time: string | null;
+    origin: string;
+    status: string;
+    completion_percentage: number;
+    badge_name: string | null;
+  }[]>([]);
+
+  useEffect(() => {
+    api
+      .get("/api/dashboard/exercises")
+      .then((res) => {
+        const plans = res.data?.plans ?? [];
+        setRecentPlans(plans.slice(0, 3));
+      })
+      .catch(() => {});
+  }, []);
 
   if (loading) {
     return (
@@ -520,78 +534,73 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* ── AI-Generated Exercises ─────────────────────────────────── */}
+        {/* ── Mental Exercises ──────────────────────────────────────── */}
         <section className="mb-8">
-          <div className="mb-5 flex items-center gap-2">
-            <Brain size={16} weight="bold" className="text-primary" />
-            <h2 className="font-heading text-base font-semibold text-foreground">
-              AI-Generated Exercises
-            </h2>
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain size={16} weight="bold" className="text-primary" />
+              <h2 className="font-heading text-base font-semibold text-foreground">
+                Mental Exercises
+              </h2>
+            </div>
+            <button
+              onClick={() => router.push("/dashboard/exercises")}
+              className="font-sans text-xs font-medium text-primary transition-colors hover:text-primary/80"
+            >
+              View all exercises
+              <ArrowRight size={12} weight="bold" className="inline ml-0.5" />
+            </button>
           </div>
 
-          {chapters.length > 0 ? (
+          {recentPlans.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {chapters.map((chapter, idx) => {
-                const chapterTasks = chapter.tasks ?? [];
-                const completedCount = chapterTasks.filter((t) =>
-                  completedKeys.has(t.task_key),
-                ).length;
-                const isComplete =
-                  chapterTasks.length > 0 &&
-                  completedCount === chapterTasks.length;
-
-                return (
-                  <div
-                    key={chapter.chapter_key}
-                    className="flex flex-col border border-border bg-card"
-                  >
-                    {/* Image placeholder */}
-                    <div
-                      className={`h-36 ${exerciseImages[idx % exerciseImages.length]} flex items-center justify-center`}
-                    >
-                      <Brain
-                        size={32}
-                        weight="thin"
-                        className="text-muted-foreground/40"
-                      />
-                    </div>
-
-                    <div className="flex-1 p-5">
-                      <p className="mb-1.5 font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                        {getCategoryLabel(chapter.chapter_key)}
-                      </p>
-                      <h3 className="mb-2 font-heading text-sm font-semibold text-foreground">
-                        {chapter.chapter_title}
-                      </h3>
-                      <p className="font-sans text-xs leading-relaxed text-muted-foreground">
-                        {chapter.content}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                      <span className="font-sans text-xs text-muted-foreground">
-                        {chapter.estimated_time}
+              {recentPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  onClick={() => router.push(`/dashboard/exercises/${plan.id}`)}
+                  className="flex flex-col border border-border bg-card p-5 text-left transition hover:border-primary/30 hover:bg-primary/3"
+                >
+                  <p className="font-heading text-sm font-semibold text-foreground">
+                    {plan.title}
+                  </p>
+                  <p className="mt-1 font-sans text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                    {plan.description}
+                  </p>
+                  <div className="mt-auto pt-4 flex items-center justify-between">
+                    <span className="font-sans text-xs text-muted-foreground">
+                      {plan.estimated_time}
+                    </span>
+                    {plan.status === "completed" ? (
+                      <span className="inline-flex items-center gap-1 font-sans text-xs text-primary">
+                        <CheckCircle size={12} weight="bold" />
+                        Done
                       </span>
-                      <button
-                        className="font-sans text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80 transition-opacity"
-                        onClick={() => router.push("/dashboard/exercises")}
-                      >
-                        {isComplete ? "Review" : "Begin Exercise"}
-                      </button>
-                    </div>
+                    ) : plan.status === "in_progress" ? (
+                      <span className="inline-flex items-center gap-1 font-sans text-xs text-muted-foreground">
+                        {plan.completion_percentage}%
+                      </span>
+                    ) : (
+                      <span className="font-sans text-xs font-medium text-primary">
+                        Start
+                      </span>
+                    )}
                   </div>
-                );
-              })}
+                </button>
+              ))}
             </div>
           ) : (
-            <div className="border border-border bg-card p-8 text-center">
-              <p className="mb-1 font-heading text-sm font-medium text-foreground">
-                No exercises yet
+            <button
+              onClick={() => router.push("/dashboard/exercises")}
+              className="w-full border border-dashed border-border bg-card p-8 text-center transition hover:border-primary/30 hover:bg-primary/3"
+            >
+              <Brain size={24} weight="thin" className="mx-auto text-muted-foreground" />
+              <p className="mt-3 font-heading text-sm font-medium text-foreground">
+                Begin your first exercise
               </p>
-              <p className="mx-auto max-w-sm font-sans text-xs text-muted-foreground">
-                Complete onboarding to generate your personalized exercise plan.
+              <p className="mt-1 font-sans text-xs text-muted-foreground">
+                Choose from guided breathing, body scan, and more.
               </p>
-            </div>
+            </button>
           )}
         </section>
       </div>

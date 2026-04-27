@@ -5,24 +5,31 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AvailabilityTemplate extends Model
+class Review extends Model
 {
     protected $fillable = [
+        'booking_id',
+        'patient_id',
         'consultant_id',
-        'day_of_week',
-        'start_time',
-        'end_time',
+        'rating',
+        'comment',
     ];
 
     protected function casts(): array
     {
         return [
-            'day_of_week' => 'integer',
-            'start_time' => 'datetime:H:i',
-            'end_time' => 'datetime:H:i',
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
+            'rating' => 'integer',
         ];
+    }
+
+    public function booking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class);
+    }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'patient_id');
     }
 
     public function consultant(): BelongsTo

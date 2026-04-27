@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . "/../routes/console.php",
         health: "/up",
     )
+    ->withProviders([
+        \App\Providers\AuthServiceProvider::class,
+    ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
         $middleware->statefulApi();

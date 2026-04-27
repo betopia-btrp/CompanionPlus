@@ -20,6 +20,7 @@ import {
   VideoCamera,
 } from "@phosphor-icons/react";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import { toast } from "sonner";
 
 const locales = { "en-US": enUS };
 const localizer = dateFnsLocalizer({
@@ -75,44 +76,46 @@ export default function ConsultantBookingPage() {
   const [selection, setSelection] = useState<{ start: Date; end: Date } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>("week");
+  const [freeSessions, setFreeSessions] = useState(0);
 
   useEffect(() => {
-    api
-      .get(`/api/consultants/${consultantId}`)
-      .then((res) => setData(res.data))
+    Promise.all([
+      api.get(`/api/consultants/${consultantId}`),
+      api.get("/api/me"),
+    ])
+      .then(([consultantRes, userRes]) => {
+        setData(consultantRes.data);
+        setFreeSessions(userRes.data.free_sessions_remaining ?? 0);
+      })
       .catch(() => router.push("/dashboard/booking"))
       .finally(() => setLoading(false));
   }, [consultantId, router]);
 
   const sessionId = searchParams.get("session_id");
-  const returnBookingId = searchParams.get("booking_id");
 
   useEffect(() => {
-    if (sessionId && returnBookingId && !completeLoading && !message) {
+    if (sessionId && !completeLoading) {
       setCompleteLoading(true);
       api
         .post("/api/bookings/complete", {
           session_id: sessionId,
-          booking_id: returnBookingId,
         })
         .then(() => {
-          setMessage("Payment successful! Your session is confirmed.");
+          toast.success("Payment successful! Your session is confirmed.");
         })
         .catch(() => {
-          setMessage("Payment verification failed. Please contact support.");
+          toast.error("Payment verification failed. Please contact support.");
         })
         .finally(() => {
           setCompleteLoading(false);
           const url = new URL(window.location.href);
           url.searchParams.delete("session_id");
-          url.searchParams.delete("booking_id");
           window.history.replaceState({}, "", url.pathname);
         });
     }
-  }, [sessionId, returnBookingId]);
+  }, [sessionId]);
 
   const events: RBCEvent[] = useMemo(() => {
     if (!data) return [];
@@ -162,19 +165,19 @@ export default function ConsultantBookingPage() {
         consultant_id: Number(consultantId),
         scheduled_start: selection.start.toISOString(),
         scheduled_end: selection.end.toISOString(),
-        success_url: `${window.location.origin}/dashboard/booking/${consultantId}?session_id={CHECKOUT_SESSION_ID}&booking_id={BOOKING_ID}`,
+        success_url: `${window.location.origin}/dashboard/booking/${consultantId}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${window.location.origin}/dashboard/booking/${consultantId}`,
       });
 
       if (res.data.free_session) {
-        setMessage("Session booked with your free session credit!");
+        toast.success("Session booked with your free session credit!");
         setSelection(null);
         setCheckoutLoading(false);
       } else {
         window.location.href = res.data.url;
       }
     } catch {
-      setMessage("Failed to initiate checkout.");
+      toast.error("Failed to initiate checkout.");
       setCheckoutLoading(false);
     }
   };
@@ -216,6 +219,18 @@ export default function ConsultantBookingPage() {
   if (!data) return null;
 
   const c = data.consultant;
+  const sel = selection;
+  const totalMinutes = sel ? Math.round((sel.end.getTime() - sel.start.getTime()) / 60000) : 0;
+  const hours = totalMinutes / 60;
+  const totalFee = Math.round(c.base_rate_bdt * hours);
+  const isFree = freeSessions > 0;
+
+  const formatDuration = () => {
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
+  };
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
@@ -241,7 +256,7 @@ export default function ConsultantBookingPage() {
               </p>
               <div className="mt-3 flex items-center gap-1 font-sans text-xs text-muted-foreground">
                 <Star size={12} weight="fill" className="text-amber-500" />
-                {c.average_rating || "5.0"}
+                {c.average_rating ?? "—"}
               </div>
             </div>
             <div className="text-right">
@@ -259,26 +274,6 @@ export default function ConsultantBookingPage() {
             </p>
           )}
         </div>
-
-        {/* ── Message ────────────────────────────────────────────── */}
-        {message && (
-          <div
-            className={`mb-6 border p-4 text-center font-sans text-sm ${
-              completeLoading
-                ? "border-primary/40 bg-primary/5 text-foreground"
-                : "border-primary/60 bg-primary/10 text-foreground"
-            }`}
-          >
-            {completeLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Spinner size={16} className="animate-spin" />
-                Verifying payment...
-              </span>
-            ) : (
-              message
-            )}
-          </div>
-        )}
 
         {/* ── Calendar + Selection ────────────────────────────────── */}
         <div className="grid gap-8 lg:grid-cols-3">
@@ -319,35 +314,58 @@ export default function ConsultantBookingPage() {
               Your Booking
             </h3>
 
-            {selection ? (
+            {sel ? (
               <div className="space-y-4">
+                {freeSessions > 0 && (
+                  <div className="flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                    <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-sans text-xs text-emerald-700">
+                      {freeSessions} free session{freeSessions > 1 ? "s" : ""} remaining
+                    </span>
+                  </div>
+                )}
+
                 <div>
-                  <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                    Date & Time
-                  </p>
                   <p className="mt-1 font-heading text-base font-medium text-foreground">
-                    {formatDate(selection.start)}
+                    {formatDate(sel.start)}
                   </p>
                   <p className="font-sans text-sm text-muted-foreground">
-                    {formatTime(selection.start)} &ndash;{" "}
-                    {formatTime(selection.end)}
+                    {formatTime(sel.start)} &ndash;{" "}
+                    {formatTime(sel.end)}
                   </p>
                   <p className="mt-1 font-sans text-xs text-muted-foreground">
-                    {(selection.end.getTime() - selection.start.getTime()) / 3600000} hr
-                    {Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60 > 0
-                      ? ` ${Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60} min`
-                      : ""}
-                    {" "}× ৳{c.base_rate_bdt}/hr
+                    {formatDuration()} × ৳{c.base_rate_bdt}/hr
                   </p>
                 </div>
 
-                <div className="border-t border-border pt-4">
+                <div className="border-t border-border pt-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-sans text-sm text-muted-foreground">
                       Session Fee
                     </span>
                     <span className="font-heading text-lg font-semibold text-foreground">
-                      ৳{Math.round(c.base_rate_bdt * (selection.end.getTime() - selection.start.getTime()) / 3600000)}
+                      ৳{totalFee}
+                    </span>
+                  </div>
+                  {isFree && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-sans text-sm text-emerald-600">
+                        Free session credit
+                      </span>
+                      <span className="font-sans text-sm font-medium text-emerald-600">
+                        −৳{totalFee}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans text-sm font-medium text-foreground">
+                      {isFree ? "Total Due" : "Total"}
+                    </span>
+                    <span className="font-heading text-xl font-bold text-foreground">
+                      ৳{isFree ? 0 : totalFee}
                     </span>
                   </div>
                 </div>
@@ -360,11 +378,11 @@ export default function ConsultantBookingPage() {
                   {checkoutLoading ? (
                     <span className="flex items-center gap-2">
                       <Spinner size={14} className="animate-spin" />
-                      Redirecting...
+                      Processing...
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      Confirm & Pay
+                      {isFree ? "Confirm Free Session" : "Confirm & Pay"}
                       <ArrowRight size={14} weight="bold" />
                     </span>
                   )}

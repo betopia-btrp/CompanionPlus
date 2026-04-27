@@ -10,6 +10,8 @@ use Stripe\Customer;
 use Stripe\Price;
 use Stripe\Product;
 use Stripe\Stripe;
+use Stripe\Webhook;
+use Stripe\Exception\SignatureVerificationException;
 
 class StripeService
 {
@@ -88,6 +90,17 @@ class StripeService
             'id' => $sessionId,
             'expand' => ['subscription'],
         ]);
+    }
+
+    public function verifyWebhookSignature(string $payload, string $sigHeader): object
+    {
+        $event = Webhook::constructEvent(
+            $payload,
+            $sigHeader,
+            config('stripe.webhook_secret')
+        );
+
+        return $event;
     }
 
     public function syncProductAndPrice(SubscriptionPlan $plan): void

@@ -25,6 +25,7 @@ class ProfileController extends Controller
             'onboarding_completed' => $user->onboarding_completed,
             'subscription_plan' => $user->subscriptionPlan,
             'active_subscription' => $user->activeSubscription ? true : false,
+            'subscription_end_date' => $user->activeSubscription?->current_period_end?->toISOString(),
         ]);
     }
 
