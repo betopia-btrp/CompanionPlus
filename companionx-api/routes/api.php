@@ -45,16 +45,7 @@ Route::middleware("auth:sanctum")->group(function () {
             BookingFlowController::class,
             "slots",
         ]);
-        Route::get("/booking/hold", [
-            BookingFlowController::class,
-            "currentHold",
-        ]);
-        Route::post("/booking/hold", [BookingFlowController::class, "hold"]);
-        Route::delete("/booking/hold/{slotId}", [
-            BookingFlowController::class,
-            "release",
-        ]);
-    Route::post("/bookings/checkout", [BookingFlowController::class, "checkout"]);
+        Route::post("/bookings/checkout", [BookingFlowController::class, "checkout"]);
     Route::post("/bookings/complete", [BookingFlowController::class, "complete"]);
         Route::get("/dashboard/recommendations", [
             DashboardController::class,
@@ -107,17 +98,13 @@ Route::middleware("auth:sanctum")->group(function () {
             SessionNoteController::class,
             "update",
         ]);
-        Route::post("/consultant/slots", [
+        Route::post("/consultant/overrides", [
             ConsultantDashboardController::class,
-            "storeSlot",
+            "storeOverride",
         ]);
-        Route::patch("/consultant/slots/{slotId}", [
+        Route::delete("/consultant/overrides/{overrideId}", [
             ConsultantDashboardController::class,
-            "updateSlot",
-        ]);
-        Route::delete("/consultant/slots/{slotId}", [
-            ConsultantDashboardController::class,
-            "destroySlot",
+            "destroyOverride",
         ]);
         Route::post("/consultant/bookings/{bookingId}/approve", [
             ConsultantDashboardController::class,

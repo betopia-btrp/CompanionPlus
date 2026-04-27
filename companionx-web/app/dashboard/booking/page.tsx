@@ -383,14 +383,14 @@ function ConsultantCard({
               )}
             </div>
             {availableDays.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="font-sans text-[10px] font-medium text-muted-foreground tracking-wider uppercase">
+              <div className="flex items-center gap-1 overflow-x-hidden">
+                <span className="hidden sm:inline font-sans text-[10px] font-medium text-muted-foreground tracking-wider uppercase shrink-0">
                   Available:
                 </span>
                 {dayNames.map((name, i) => (
                   <span
                     key={i}
-                    className={`font-sans text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 border ${
+                    className={`font-sans text-[10px] font-medium uppercase tracking-wider px-1 py-0.5 border shrink-0 ${
                       availableDays.includes(i)
                         ? "border-emerald-500/40 text-emerald-700 bg-emerald-500/10"
                         : "border-transparent text-muted-foreground/30"

@@ -78,11 +78,17 @@ export default function ConsultantBookingPage() {
   const [completeLoading, setCompleteLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>("week");
+  const [freeSessions, setFreeSessions] = useState(0);
 
   useEffect(() => {
-    api
-      .get(`/api/consultants/${consultantId}`)
-      .then((res) => setData(res.data))
+    Promise.all([
+      api.get(`/api/consultants/${consultantId}`),
+      api.get("/api/me"),
+    ])
+      .then(([consultantRes, userRes]) => {
+        setData(consultantRes.data);
+        setFreeSessions(userRes.data.free_sessions_remaining ?? 0);
+      })
       .catch(() => router.push("/dashboard/booking"))
       .finally(() => setLoading(false));
   }, [consultantId, router]);
@@ -213,6 +219,18 @@ export default function ConsultantBookingPage() {
   if (!data) return null;
 
   const c = data.consultant;
+  const sel = selection;
+  const totalMinutes = sel ? Math.round((sel.end.getTime() - sel.start.getTime()) / 60000) : 0;
+  const hours = totalMinutes / 60;
+  const totalFee = Math.round(c.base_rate_bdt * hours);
+  const isFree = freeSessions > 0;
+
+  const formatDuration = () => {
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
+  };
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
@@ -296,35 +314,58 @@ export default function ConsultantBookingPage() {
               Your Booking
             </h3>
 
-            {selection ? (
+            {sel ? (
               <div className="space-y-4">
+                {freeSessions > 0 && (
+                  <div className="flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                    <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-sans text-xs text-emerald-700">
+                      {freeSessions} free session{freeSessions > 1 ? "s" : ""} remaining
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <p className="mt-1 font-heading text-base font-medium text-foreground">
-                    {formatDate(selection.start)}
+                    {formatDate(sel.start)}
                   </p>
                   <p className="font-sans text-sm text-muted-foreground">
-                    {formatTime(selection.start)} &ndash;{" "}
-                    {formatTime(selection.end)}
+                    {formatTime(sel.start)} &ndash;{" "}
+                    {formatTime(sel.end)}
                   </p>
                   <p className="mt-1 font-sans text-xs text-muted-foreground">
-                    {(() => {
-                      const mins = Math.round((selection.end.getTime() - selection.start.getTime()) / 60000);
-                      if (mins < 60) return `${mins} min`;
-                      const h = Math.floor(mins / 60);
-                      const m = mins % 60;
-                      return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
-                    })()}
-                    {" "}× ৳{c.base_rate_bdt}/hr
+                    {formatDuration()} × ৳{c.base_rate_bdt}/hr
                   </p>
                 </div>
 
-                <div className="border-t border-border pt-4">
+                <div className="border-t border-border pt-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-sans text-sm text-muted-foreground">
                       Session Fee
                     </span>
                     <span className="font-heading text-lg font-semibold text-foreground">
-                      ৳{Math.round(c.base_rate_bdt * (selection.end.getTime() - selection.start.getTime()) / 3600000)}
+                      ৳{totalFee}
+                    </span>
+                  </div>
+                  {isFree && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-sans text-sm text-emerald-600">
+                        Free session credit
+                      </span>
+                      <span className="font-sans text-sm font-medium text-emerald-600">
+                        −৳{totalFee}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans text-sm font-medium text-foreground">
+                      {isFree ? "Total Due" : "Total"}
+                    </span>
+                    <span className="font-heading text-xl font-bold text-foreground">
+                      ৳{isFree ? 0 : totalFee}
                     </span>
                   </div>
                 </div>
@@ -337,11 +378,11 @@ export default function ConsultantBookingPage() {
                   {checkoutLoading ? (
                     <span className="flex items-center gap-2">
                       <Spinner size={14} className="animate-spin" />
-                      Redirecting...
+                      Processing...
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      Confirm & Pay
+                      {isFree ? "Confirm Free Session" : "Confirm & Pay"}
                       <ArrowRight size={14} weight="bold" />
                     </span>
                   )}

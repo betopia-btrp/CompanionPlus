@@ -47,11 +47,6 @@ class ConsultantProfile extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function availabilitySlots(): HasMany
-    {
-        return $this->hasMany(AvailabilitySlot::class, 'consultant_id');
-    }
-
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class, 'consultant_id');

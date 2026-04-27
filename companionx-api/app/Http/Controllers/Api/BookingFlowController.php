@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AvailabilitySlot;
 use App\Models\Booking;
 use App\Models\ConsultantProfile;
 use App\Models\Subscription;
 use App\Models\Transaction;
+use App\Services\AvailabilityService;
 use App\Services\BookingService;
 use App\Services\StripeService;
-use Carbon\Carbon;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,15 +18,26 @@ use Illuminate\Support\Str;
 class BookingFlowController extends Controller
 {
     public function __construct(
-        private readonly StripeService $stripe
+        private readonly StripeService $stripe,
+        private readonly AvailabilityService $availabilityService,
     ) {}
 
-    public function slots(Request $request, int $consultantId, BookingService $bookingService)
+    public function slots(Request $request, int $consultantId)
     {
         $consultant = ConsultantProfile::where('user_id', $consultantId)
             ->where('is_approved', true)
             ->with('user:id,first_name,last_name')
             ->firstOrFail();
+
+        $validated = $request->validate([
+            'start_date' => 'sometimes|date',
+            'end_date' => 'sometimes|date|after_or_equal:start_date',
+        ]);
+
+        $start = Carbon::parse($validated['start_date'] ?? now()->startOfDay());
+        $end = Carbon::parse($validated['end_date'] ?? now()->addWeeks(4)->endOfDay());
+
+        $windows = $this->availabilityService->computeWindows($consultant->user_id, $start, $end);
 
         return response()->json([
             'consultant' => [
@@ -34,34 +45,7 @@ class BookingFlowController extends Controller
                 'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                 'specialization' => $consultant->specialization,
             ],
-            'slots' => $bookingService->listConsultantSlots($consultant, $request->user()),
-        ]);
-    }
-
-    public function currentHold(Request $request, BookingService $bookingService)
-    {
-        return response()->json([
-            'hold' => $bookingService->buildActiveBookingPayload($request->user()),
-        ]);
-    }
-
-    public function hold(Request $request, BookingService $bookingService)
-    {
-        $validated = $request->validate([
-            'slot_id' => 'required|integer|exists:availability_slots,id',
-        ]);
-
-        return response()->json(
-            $bookingService->bookSlot($request->user(), (int) $validated['slot_id'])
-        );
-    }
-
-    public function release(Request $request, int $slotId, BookingService $bookingService)
-    {
-        $bookingService->cancelBooking($request->user(), $slotId);
-
-        return response()->json([
-            'message' => 'Booking cancelled.',
+            'windows' => $windows,
         ]);
     }
 
@@ -81,27 +65,27 @@ class BookingFlowController extends Controller
             ->where('is_approved', true)
             ->firstOrFail();
 
-        $matchingSlot = AvailabilitySlot::where('consultant_id', $consultant->user_id)
-            ->where('start_datetime', '<=', $start)
-            ->where('end_datetime', '>=', $end)
-            ->whereNull('deleted_at')
-            ->orderBy('start_datetime')
-            ->first();
-
-        if (!$matchingSlot) {
+        // Validate against computed availability
+        if (!$this->availabilityService->isTimeAvailable($consultant->user_id, $start, $end)) {
             return response()->json([
-                'error' => 'Selected time range is not within available slots.',
+                'error' => 'Selected time range is not available.',
             ], 422);
         }
 
-        return DB::transaction(function () use ($user, $consultant, $matchingSlot, $start, $end, $request) {
+        // Check consultant's monthly booking limit (Free plan: 10 hours/month)
+        if (!$user->can('book', [$consultant, $start, $end])) {
+            return response()->json([
+                'error' => 'This consultant has reached their monthly booking limit.',
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($user, $consultant, $start, $end, $request) {
             $durationHours = $start->diffInMinutes($end) / 60;
             $totalAmount = round($consultant->base_rate_bdt * $durationHours);
 
             $booking = Booking::create([
                 'patient_id' => $user->id,
                 'consultant_id' => $consultant->user_id,
-                'slot_id' => $matchingSlot->id,
                 'status' => 'booked',
                 'jitsi_room_uuid' => Str::uuid(),
                 'price_at_booking' => $totalAmount,
@@ -278,4 +262,5 @@ class BookingFlowController extends Controller
             ],
         ]);
     }
+
 }

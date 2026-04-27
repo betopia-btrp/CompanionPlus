@@ -3,18 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AvailabilitySlot;
+use App\Models\AvailabilityOverride;
 use App\Models\AvailabilityTemplate;
 use App\Models\Booking;
 use App\Models\Transaction;
+use App\Services\AvailabilityService;
 use App\Services\ConsultantSchedulingService;
-use App\Services\SlotGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class ConsultantDashboardController extends Controller
 {
+    public function __construct(
+        private readonly AvailabilityService $availabilityService,
+    ) {}
+
     public function show(Request $request, ConsultantSchedulingService $service)
     {
         return response()->json(
@@ -45,86 +49,62 @@ class ConsultantDashboardController extends Controller
         ]);
     }
 
-    public function storeSlot(Request $request, ConsultantSchedulingService $service)
+    // ── Overrides ─────────────────────────────────────────────────────
+
+    public function storeOverride(Request $request)
     {
+        $profile = $request->user()->consultantProfile;
+        if (!$profile) {
+            throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
+        }
+
         $validated = $request->validate([
             'start_datetime' => 'required|date|after:now',
             'end_datetime' => 'required|date|after:start_datetime',
+            'type' => 'required|in:available,blocked',
+            'reason' => 'nullable|string|max:500',
         ]);
 
-        $slot = $service->createSlot($request->user(), $validated);
+        $override = AvailabilityOverride::create([
+            'consultant_id' => $profile->user_id,
+            'start_datetime' => $validated['start_datetime'],
+            'end_datetime' => $validated['end_datetime'],
+            'type' => $validated['type'],
+            'reason' => $validated['reason'] ?? null,
+        ]);
 
         return response()->json([
-            'message' => 'Availability slot created.',
-            'slot' => $service->serializeSlot($slot),
+            'message' => 'Override saved.',
+            'override' => [
+                'id' => $override->id,
+                'start_datetime' => $override->start_datetime->toISOString(),
+                'end_datetime' => $override->end_datetime->toISOString(),
+                'type' => $override->type,
+                'reason' => $override->reason,
+            ],
         ], 201);
     }
 
-    public function updateSlot(Request $request, int $slotId, ConsultantSchedulingService $service)
-    {
-        $validated = $request->validate([
-            'start_datetime' => 'required|date|after:now',
-            'end_datetime' => 'required|date|after:start_datetime',
-        ]);
-
-        $slot = $service->updateSlot($request->user(), $slotId, $validated);
-
-        return response()->json([
-            'message' => 'Slot updated.',
-            'slot' => $service->serializeSlot($slot),
-        ]);
-    }
-
-    public function destroySlot(Request $request, int $slotId, ConsultantSchedulingService $service)
-    {
-        $result = $service->deleteSlot($request->user(), $slotId);
-
-        return response()->json([
-            'message' => $result['message'],
-            'cancelled_bookings' => $result['cancelled_bookings'] ?? 0,
-        ]);
-    }
-
-    public function approveBooking(Request $request, int $bookingId)
+    public function destroyOverride(Request $request, int $overrideId)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
-            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
+            throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
 
-        $booking = Booking::where('consultant_id', $profile->user_id)
-            ->where('status', 'pending')
-            ->findOrFail($bookingId);
+        $override = AvailabilityOverride::where('consultant_id', $profile->user_id)
+            ->findOrFail($overrideId);
 
-        $booking->update(['status' => 'confirmed']);
+        $override->delete();
 
-        return response()->json(['message' => 'Booking confirmed.']);
-    }
-
-    public function rejectBooking(Request $request, int $bookingId)
-    {
-        $profile = $request->user()->consultantProfile;
-
-        if (!$profile) {
-            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
-        }
-
-        $booking = Booking::where('consultant_id', $profile->user_id)
-            ->where('status', 'pending')
-            ->findOrFail($bookingId);
-
-        $booking->update(['status' => 'cancelled']);
-
-        return response()->json(['message' => 'Booking rejected.']);
+        return response()->json(['message' => 'Override removed.']);
     }
 
     // ── Schedule ──────────────────────────────────────────────────────
 
-    public function schedule(Request $request, SlotGeneratorService $generator)
+    public function schedule(Request $request)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
             throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
@@ -137,21 +117,19 @@ class ConsultantDashboardController extends Controller
         $start = Carbon::parse($validated['start_date'])->startOfDay();
         $end = Carbon::parse($validated['end_date'])->endOfDay();
 
-        $slots = AvailabilitySlot::where('consultant_id', $profile->user_id)
-            ->active()
+        $windows = $this->availabilityService->computeWindows($profile->user_id, $start, $end);
+
+        $overrides = AvailabilityOverride::where('consultant_id', $profile->user_id)
             ->whereBetween('start_datetime', [$start, $end])
-            ->with('activeBooking')
             ->orderBy('start_datetime')
             ->get()
-            ->reject(fn (AvailabilitySlot $slot) => $slot->hasConfirmedBookings())
-            ->map(fn (AvailabilitySlot $slot) => [
-                'id' => $slot->id,
-                'start_datetime' => optional($slot->start_datetime)->toISOString(),
-                'end_datetime' => optional($slot->end_datetime)->toISOString(),
-                'status' => $this->resolveSlotStatus($slot),
-                'source_template_id' => $slot->source_template_id,
-            ])
-            ->values();
+            ->map(fn ($o) => [
+                'id' => $o->id,
+                'start_datetime' => $o->start_datetime->toISOString(),
+                'end_datetime' => $o->end_datetime->toISOString(),
+                'type' => $o->type,
+                'reason' => $o->reason,
+            ]);
 
         $bookings = Booking::where('consultant_id', $profile->user_id)
             ->where(function ($q) use ($start, $end) {
@@ -166,30 +144,45 @@ class ConsultantDashboardController extends Controller
             ->values();
 
         $templates = AvailabilityTemplate::where('consultant_id', $profile->user_id)
-            ->orderBy('day_of_week')
-            ->orderBy('start_time')
+            ->orderBy('day_of_week')->orderBy('start_time')
             ->get()
             ->map(fn (AvailabilityTemplate $t) => [
                 'id' => $t->id,
                 'day_of_week' => $t->day_of_week,
-                'start_time' => $t->start_time instanceof Carbon ? $t->start_time->format('H:i') : (string) $t->start_time,
-                'end_time' => $t->end_time instanceof Carbon ? $t->end_time->format('H:i') : (string) $t->end_time,
+                'start_time' => $t->start_time
+                    ? Carbon::parse($t->start_time->format('H:i'), 'UTC')->setTimezone('Asia/Dhaka')->format('H:i')
+                    : '',
+                'end_time' => $t->end_time
+                    ? Carbon::parse($t->end_time->format('H:i'), 'UTC')->setTimezone('Asia/Dhaka')->format('H:i')
+                    : '',
             ])
             ->values();
 
+        $plan = $profile->user?->subscriptionPlan;
+        $maxHours = $plan?->getFeature('max_available_hours_per_month');
+
+        $bookedMinutes = Booking::where('consultant_id', $profile->user_id)
+            ->whereIn('status', ['booked', 'confirmed'])
+            ->where('scheduled_start', '>=', now()->startOfMonth())
+            ->where('scheduled_start', '<=', now()->endOfMonth())
+            ->get()
+            ->sum(fn (Booking $b) => $b->scheduled_start->diffInMinutes($b->scheduled_end));
+
         return response()->json([
-            'slots' => $slots,
+            'windows' => $windows,
+            'overrides' => $overrides,
             'bookings' => $bookings,
             'templates' => $templates,
+            'used_hours' => round($bookedMinutes / 60, 1),
+            'max_hours' => $maxHours,
         ]);
     }
 
     // ── Templates ─────────────────────────────────────────────────────
 
-    public function storeTemplate(Request $request, SlotGeneratorService $generator)
+    public function storeTemplate(Request $request)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
             throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
@@ -200,21 +193,16 @@ class ConsultantDashboardController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
 
+        $startUtc = Carbon::parse($validated['start_time'], 'Asia/Dhaka')->setTimezone('UTC');
+        $endUtc = Carbon::parse($validated['end_time'], 'Asia/Dhaka')->setTimezone('UTC');
+
         $template = AvailabilityTemplate::updateOrCreate(
-            [
-                'consultant_id' => $profile->user_id,
-                'day_of_week' => $validated['day_of_week'],
-            ],
-            [
-                'start_time' => $validated['start_time'],
-                'end_time' => $validated['end_time'],
-            ]
+            ['consultant_id' => $profile->user_id, 'day_of_week' => $validated['day_of_week']],
+            ['start_time' => $startUtc->format('H:i'), 'end_time' => $endUtc->format('H:i')]
         );
 
-        $generator->regenerateForTemplate($template);
-
         return response()->json([
-            'message' => 'Template saved and slots generated.',
+            'message' => 'Template saved.',
             'template' => [
                 'id' => $template->id,
                 'day_of_week' => $template->day_of_week,
@@ -224,23 +212,14 @@ class ConsultantDashboardController extends Controller
         ], 201);
     }
 
-    public function destroyTemplate(Request $request, int $templateId, SlotGeneratorService $generator)
+    public function destroyTemplate(Request $request, int $templateId)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
             throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
 
         $template = AvailabilityTemplate::where('consultant_id', $profile->user_id)->findOrFail($templateId);
-
-        // Delete future unbooked generated slots
-        AvailabilitySlot::where('source_template_id', $template->id)
-            ->active() // Only delete active slots
-            ->where('start_datetime', '>', now())
-            ->whereDoesntHave('bookings', fn ($q) => $q->whereIn('status', ['booked', 'pending', 'confirmed']))
-            ->update(['source_template_id' => null]);
-
         $template->delete();
 
         return response()->json(['message' => 'Template removed.']);
@@ -248,10 +227,33 @@ class ConsultantDashboardController extends Controller
 
     // ── Bookings ──────────────────────────────────────────────────────
 
+    public function approveBooking(Request $request, int $bookingId)
+    {
+        $profile = $request->user()->consultantProfile;
+        if (!$profile) {
+            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
+        }
+        $booking = Booking::where('consultant_id', $profile->user_id)
+            ->where('status', 'pending')->findOrFail($bookingId);
+        $booking->update(['status' => 'confirmed']);
+        return response()->json(['message' => 'Booking confirmed.']);
+    }
+
+    public function rejectBooking(Request $request, int $bookingId)
+    {
+        $profile = $request->user()->consultantProfile;
+        if (!$profile) {
+            throw ValidationException::withMessages(['booking' => ['Consultant profile not found.']]);
+        }
+        $booking = Booking::where('consultant_id', $profile->user_id)
+            ->where('status', 'pending')->findOrFail($bookingId);
+        $booking->update(['status' => 'cancelled']);
+        return response()->json(['message' => 'Booking rejected.']);
+    }
+
     public function bookings(Request $request)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
             throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
@@ -269,18 +271,14 @@ class ConsultantDashboardController extends Controller
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
-
         if (!empty($validated['date_from'])) {
             $query->where('scheduled_start', '>=', Carbon::parse($validated['date_from'])->startOfDay());
         }
-
         if (!empty($validated['date_to'])) {
             $query->where('scheduled_start', '<=', Carbon::parse($validated['date_to'])->endOfDay());
         }
 
-        $bookings = $query
-            ->orderBy('scheduled_start', 'desc')
-            ->paginate(20);
+        $bookings = $query->orderBy('scheduled_start', 'desc')->paginate(20);
 
         return response()->json([
             'bookings' => $bookings->getCollection()->map(fn (Booking $b) => $this->serializeBooking($b))->values(),
@@ -293,12 +291,11 @@ class ConsultantDashboardController extends Controller
         ]);
     }
 
-    // ── Wallet / Earnings ─────────────────────────────────────────────
+    // ── Wallet ─────────────────────────────────────────────────────────
 
     public function wallet(Request $request)
     {
         $profile = $request->user()->consultantProfile;
-
         if (!$profile) {
             throw ValidationException::withMessages(['consultant' => ['Consultant profile not found.']]);
         }
@@ -307,32 +304,20 @@ class ConsultantDashboardController extends Controller
         $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
         $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
 
-        $monthlyEarnings = Transaction::query()
-            ->whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
-            ->where('status', 'succeeded')
-            ->where('created_at', '>=', $startOfMonth)
-            ->sum('consultant_net');
+        $monthlyEarnings = Transaction::whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
+            ->where('status', 'succeeded')->where('created_at', '>=', $startOfMonth)->sum('consultant_net');
 
-        $lastMonthEarnings = Transaction::query()
-            ->whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
-            ->where('status', 'succeeded')
-            ->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])
-            ->sum('consultant_net');
+        $lastMonthEarnings = Transaction::whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
+            ->where('status', 'succeeded')->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])->sum('consultant_net');
 
         $changePercent = $lastMonthEarnings > 0
-            ? round((($monthlyEarnings - $lastMonthEarnings) / $lastMonthEarnings) * 100, 1)
-            : 0;
+            ? round((($monthlyEarnings - $lastMonthEarnings) / $lastMonthEarnings) * 100, 1) : 0;
 
-        $totalEarnings = Transaction::query()
-            ->whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
-            ->where('status', 'succeeded')
-            ->sum('consultant_net');
+        $totalEarnings = Transaction::whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
+            ->where('status', 'succeeded')->sum('consultant_net');
 
-        $transactions = Transaction::query()
-            ->whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
-            ->with('booking:id,scheduled_start,scheduled_end')
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $transactions = Transaction::whereHas('booking', fn ($q) => $q->where('consultant_id', $profile->user_id))
+            ->with('booking:id,scheduled_start,scheduled_end')->orderBy('created_at', 'desc')->paginate(20);
 
         return response()->json([
             'balance_bdt' => (float) $totalEarnings,
@@ -340,8 +325,7 @@ class ConsultantDashboardController extends Controller
             'change_percent' => $changePercent,
             'transactions' => $transactions->getCollection()->map(fn (Transaction $t) => [
                 'id' => $t->id,
-                'type' => $t->type,
-                'status' => $t->status,
+                'type' => $t->type, 'status' => $t->status,
                 'total_amount' => (float) $t->total_amount,
                 'platform_fee' => (float) $t->platform_fee,
                 'consultant_net' => (float) $t->consultant_net,
@@ -350,34 +334,13 @@ class ConsultantDashboardController extends Controller
                 'created_at' => $t->created_at->toISOString(),
             ])->values(),
             'meta' => [
-                'total' => $transactions->total(),
-                'per_page' => $transactions->perPage(),
-                'current_page' => $transactions->currentPage(),
-                'last_page' => $transactions->lastPage(),
+                'total' => $transactions->total(), 'per_page' => $transactions->perPage(),
+                'current_page' => $transactions->currentPage(), 'last_page' => $transactions->lastPage(),
             ],
         ]);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
-
-    private function resolveSlotStatus(AvailabilitySlot $slot): string
-    {
-        $ab = $slot->activeBooking;
-
-        if (!$ab) {
-            return 'available';
-        }
-
-        if ($ab->status === 'booked' && !$ab->hasActiveHold()) {
-            return 'available';
-        }
-
-        if ($ab->status === 'booked' && $ab->hasActiveHold()) {
-            return 'held';
-        }
-
-        return $ab->status; // pending, confirmed
-    }
 
     private function serializeBooking(Booking $booking): array
     {
@@ -398,8 +361,7 @@ class ConsultantDashboardController extends Controller
             'is_first_time' => Booking::query()
                 ->where('patient_id', $booking->patient_id)
                 ->where('consultant_id', $booking->consultant_id)
-                ->where('id', '<', $booking->id)
-                ->doesntExist(),
+                ->where('id', '<', $booking->id)->doesntExist(),
         ];
     }
 }
