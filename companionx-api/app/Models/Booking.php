@@ -11,7 +11,6 @@ class Booking extends Model
     protected $fillable = [
         'patient_id',
         'consultant_id',
-        'slot_id',
         'status',
         'jitsi_room_uuid',
         'price_at_booking',
@@ -39,11 +38,6 @@ class Booking extends Model
     public function patient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'patient_id');
-    }
-
-    public function slot(): BelongsTo
-    {
-        return $this->belongsTo(AvailabilitySlot::class, 'slot_id');
     }
 
     public function transactions()

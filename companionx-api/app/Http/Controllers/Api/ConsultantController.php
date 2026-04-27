@@ -21,9 +21,6 @@ class ConsultantController extends Controller
             ->where('is_approved', true)
             ->with([
                 'user:id,first_name,last_name,gender',
-                'availabilitySlots' => fn ($query) => $query
-                    ->where('start_datetime', '>', now())
-                    ->orderBy('start_datetime'),
             ]);
 
         if ($request->filled('specialization')) {
@@ -54,16 +51,12 @@ class ConsultantController extends Controller
             ];
 
         return response()->json([
-            'consultants' => $consultants->map(function (ConsultantProfile $consultant) use ($bookingService, $request) {
+            'consultants' => $consultants->map(function (ConsultantProfile $consultant) {
                 $consultant->slot_summary = [
-                    'available_count' => $consultant->availabilitySlots
-                        ->filter(fn ($slot) => $bookingService->serializeSlot($slot, $request->user())['status'] === 'available')
-                        ->count(),
-                    'next_available_slot' => optional($consultant->availabilitySlots->first())->start_datetime?->toISOString(),
+                    'available_count' => 0,
+                    'next_available_slot' => null,
                 ];
-                $consultant->slots = $consultant->availabilitySlots
-                    ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
-                    ->values();
+                $consultant->slots = [];
 
                 return $consultant;
             })->values(),
@@ -80,16 +73,10 @@ class ConsultantController extends Controller
             ->where('is_approved', true)
             ->with([
                 'user:id,first_name,last_name,gender',
-                'availabilitySlots' => fn ($query) => $query
-                    ->where('start_datetime', '>', now())
-                    ->orderBy('start_datetime'),
             ])
             ->firstOrFail();
 
-        $slots = $consultant->availabilitySlots
-            ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
-            ->filter(fn ($s) => $s['status'] === 'available')
-            ->values();
+        $slots = [];
 
         return response()->json([
             'consultant' => [
@@ -158,15 +145,12 @@ class ConsultantController extends Controller
         $consultants = ConsultantProfile::whereIn('user_id', $recData->pluck('consultant_id')->filter())
             ->with([
                 'user:id,first_name,last_name,gender',
-                'availabilitySlots' => fn ($query) => $query
-                    ->where('start_datetime', '>', now())
-                    ->orderBy('start_datetime'),
             ])
             ->get()
             ->keyBy('user_id');
 
         return $recData
-            ->map(function (array $match) use ($consultants, $bookingService, $request) {
+            ->map(function (array $match) use ($consultants) {
                 $consultant = $consultants->get((int) ($match['consultant_id'] ?? 0));
 
                 if (!$consultant instanceof ConsultantProfile) {
@@ -176,14 +160,10 @@ class ConsultantController extends Controller
                 $consultant->match_reason = $match['reason'] ?? 'Strong fit for your profile.';
                 $consultant->match_rank = (int) data_get($match, 'rank', 0);
                 $consultant->slot_summary = [
-                    'available_count' => $consultant->availabilitySlots
-                        ->filter(fn ($slot) => $bookingService->serializeSlot($slot, $request->user())['status'] === 'available')
-                        ->count(),
-                    'next_available_slot' => optional($consultant->availabilitySlots->first())->start_datetime?->toISOString(),
+                    'available_count' => 0,
+                    'next_available_slot' => null,
                 ];
-                $consultant->slots = $consultant->availabilitySlots
-                    ->map(fn ($slot) => $bookingService->serializeSlot($slot, $request->user()))
-                    ->values();
+                $consultant->slots = [];
 
                 return $consultant;
             })

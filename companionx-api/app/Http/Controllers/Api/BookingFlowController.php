@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AvailabilitySlot;
+use App\Models\AvailabilityOverride;
+use App\Models\AvailabilityTemplate;
 use App\Models\Booking;
 use App\Models\ConsultantProfile;
 use App\Models\Subscription;
@@ -12,6 +13,7 @@ use App\Services\BookingService;
 use App\Services\StripeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -21,12 +23,22 @@ class BookingFlowController extends Controller
         private readonly StripeService $stripe
     ) {}
 
-    public function slots(Request $request, int $consultantId, BookingService $bookingService)
+    public function slots(Request $request, int $consultantId)
     {
         $consultant = ConsultantProfile::where('user_id', $consultantId)
             ->where('is_approved', true)
             ->with('user:id,first_name,last_name')
             ->firstOrFail();
+
+        $validated = $request->validate([
+            'start_date' => 'sometimes|date',
+            'end_date' => 'sometimes|date|after_or_equal:start_date',
+        ]);
+
+        $start = Carbon::parse($validated['start_date'] ?? now()->startOfDay());
+        $end = Carbon::parse($validated['end_date'] ?? now()->addWeeks(4)->endOfDay());
+
+        $windows = $this->computeAvailabilityWindows($consultant->user_id, $start, $end);
 
         return response()->json([
             'consultant' => [
@@ -34,34 +46,7 @@ class BookingFlowController extends Controller
                 'name' => trim(($consultant->user->first_name ?? '') . ' ' . ($consultant->user->last_name ?? '')),
                 'specialization' => $consultant->specialization,
             ],
-            'slots' => $bookingService->listConsultantSlots($consultant, $request->user()),
-        ]);
-    }
-
-    public function currentHold(Request $request, BookingService $bookingService)
-    {
-        return response()->json([
-            'hold' => $bookingService->buildActiveBookingPayload($request->user()),
-        ]);
-    }
-
-    public function hold(Request $request, BookingService $bookingService)
-    {
-        $validated = $request->validate([
-            'slot_id' => 'required|integer|exists:availability_slots,id',
-        ]);
-
-        return response()->json(
-            $bookingService->bookSlot($request->user(), (int) $validated['slot_id'])
-        );
-    }
-
-    public function release(Request $request, int $slotId, BookingService $bookingService)
-    {
-        $bookingService->cancelBooking($request->user(), $slotId);
-
-        return response()->json([
-            'message' => 'Booking cancelled.',
+            'windows' => $windows,
         ]);
     }
 
@@ -81,27 +66,20 @@ class BookingFlowController extends Controller
             ->where('is_approved', true)
             ->firstOrFail();
 
-        $matchingSlot = AvailabilitySlot::where('consultant_id', $consultant->user_id)
-            ->where('start_datetime', '<=', $start)
-            ->where('end_datetime', '>=', $end)
-            ->whereNull('deleted_at')
-            ->orderBy('start_datetime')
-            ->first();
-
-        if (!$matchingSlot) {
+        // Validate against computed availability
+        if (!$this->isTimeAvailable($consultant->user_id, $start, $end)) {
             return response()->json([
-                'error' => 'Selected time range is not within available slots.',
+                'error' => 'Selected time range is not available.',
             ], 422);
         }
 
-        return DB::transaction(function () use ($user, $consultant, $matchingSlot, $start, $end, $request) {
+        return DB::transaction(function () use ($user, $consultant, $start, $end, $request) {
             $durationHours = $start->diffInMinutes($end) / 60;
             $totalAmount = round($consultant->base_rate_bdt * $durationHours);
 
             $booking = Booking::create([
                 'patient_id' => $user->id,
                 'consultant_id' => $consultant->user_id,
-                'slot_id' => $matchingSlot->id,
                 'status' => 'booked',
                 'jitsi_room_uuid' => Str::uuid(),
                 'price_at_booking' => $totalAmount,
@@ -277,5 +255,141 @@ class BookingFlowController extends Controller
                 'last_page' => $bookings->lastPage(),
             ],
         ]);
+    }
+
+    private function isTimeAvailable(int $consultantId, Carbon $start, Carbon $end): bool
+    {
+        $overlappingBooking = Booking::where('consultant_id', $consultantId)
+            ->whereIn('status', ['booked', 'pending', 'confirmed'])
+            ->where('scheduled_start', '<', $end)
+            ->where('scheduled_end', '>', $start)
+            ->exists();
+
+        if ($overlappingBooking) {
+            return false;
+        }
+
+        $blocked = AvailabilityOverride::where('consultant_id', $consultantId)
+            ->where('type', 'blocked')
+            ->where('start_datetime', '<', $end)
+            ->where('end_datetime', '>', $start)
+            ->exists();
+
+        if ($blocked) {
+            return false;
+        }
+
+        $dayOfWeek = $start->dayOfWeek;
+        $inTemplate = AvailabilityTemplate::where('consultant_id', $consultantId)
+            ->where('day_of_week', $dayOfWeek)
+            ->get()
+            ->contains(function ($tpl) use ($start, $end) {
+                $tplStart = (clone $start)->setTimezone('Asia/Dhaka')
+                    ->setTimeFromTimeString((string) $tpl->start_time)->setTimezone('UTC');
+                $tplEnd = (clone $start)->setTimezone('Asia/Dhaka')
+                    ->setTimeFromTimeString((string) $tpl->end_time)->setTimezone('UTC');
+                return $start->gte($tplStart) && $end->lte($tplEnd);
+            });
+
+        if ($inTemplate) {
+            return true;
+        }
+
+        return AvailabilityOverride::where('consultant_id', $consultantId)
+            ->where('type', 'available')
+            ->where('start_datetime', '<=', $start)
+            ->where('end_datetime', '>=', $end)
+            ->exists();
+    }
+
+    private function computeAvailabilityWindows(int $consultantId, Carbon $start, Carbon $end): array
+    {
+        $templates = AvailabilityTemplate::where('consultant_id', $consultantId)->get();
+        $bookings = Booking::where('consultant_id', $consultantId)
+            ->whereIn('status', ['booked', 'confirmed'])
+            ->whereBetween('scheduled_start', [$start, $end])->get();
+        $blocked = AvailabilityOverride::where('consultant_id', $consultantId)
+            ->where('type', 'blocked')
+            ->whereBetween('start_datetime', [$start, $end])->get();
+        $availableOverrides = AvailabilityOverride::where('consultant_id', $consultantId)
+            ->where('type', 'available')
+            ->whereBetween('start_datetime', [$start, $end])->get();
+
+        $windows = [];
+        $current = $start->copy()->startOfDay();
+
+        while ($current->lte($end)) {
+            $dayTemplates = $templates->where('day_of_week', $current->dayOfWeek);
+
+            foreach ($dayTemplates as $tpl) {
+                $tplStart = (clone $current)->setTimezone('Asia/Dhaka')
+                    ->setTimeFromTimeString((string) $tpl->start_time)->setTimezone('UTC');
+                $tplEnd = (clone $current)->setTimezone('Asia/Dhaka')
+                    ->setTimeFromTimeString((string) $tpl->end_time)->setTimezone('UTC');
+
+                $occupied = collect();
+
+                foreach ($bookings as $b) {
+                    if ($b->scheduled_start->lt($tplEnd) && $b->scheduled_end->gt($tplStart)) {
+                        $occupied->push(['start' => max($b->scheduled_start->timestamp, $tplStart->timestamp), 'end' => min($b->scheduled_end->timestamp, $tplEnd->timestamp)]);
+                    }
+                }
+                foreach ($blocked as $o) {
+                    if ($o->start_datetime->lt($tplEnd) && $o->end_datetime->gt($tplStart)) {
+                        $occupied->push(['start' => max($o->start_datetime->timestamp, $tplStart->timestamp), 'end' => min($o->end_datetime->timestamp, $tplEnd->timestamp)]);
+                    }
+                }
+
+                $occupied = $occupied->sortBy('start')->values();
+                $merged = [];
+                foreach ($occupied as $seg) {
+                    if (empty($merged)) {
+                        $merged[] = $seg;
+                    } else {
+                        $last = &$merged[count($merged) - 1];
+                        if ($seg['start'] <= $last['end']) {
+                            $last['end'] = max($last['end'], $seg['end']);
+                        } else {
+                            $merged[] = $seg;
+                        }
+                    }
+                }
+
+                $cursor = $tplStart->timestamp;
+                foreach ($merged as $seg) {
+                    if ($seg['start'] > $cursor) {
+                        $windows[] = ['start' => Carbon::createFromTimestamp($cursor)->toISOString(), 'end' => Carbon::createFromTimestamp($seg['start'])->toISOString()];
+                    }
+                    $cursor = max($cursor, $seg['end']);
+                }
+                if ($cursor < $tplEnd->timestamp) {
+                    $windows[] = ['start' => Carbon::createFromTimestamp($cursor)->toISOString(), 'end' => $tplEnd->toISOString()];
+                }
+            }
+
+            foreach ($availableOverrides as $o) {
+                if ($o->start_datetime->toDateString() === $current->toDateString()) {
+                    $inTemplate = false;
+                    foreach ($dayTemplates as $tpl) {
+                        $tplStart = (clone $current)->setTimezone('Asia/Dhaka')
+                            ->setTimeFromTimeString((string) $tpl->start_time)->setTimezone('UTC');
+                        $tplEnd = (clone $current)->setTimezone('Asia/Dhaka')
+                            ->setTimeFromTimeString((string) $tpl->end_time)->setTimezone('UTC');
+                        if ($o->start_datetime->gte($tplStart) && $o->end_datetime->lte($tplEnd)) {
+                            $inTemplate = true;
+                            break;
+                        }
+                    }
+                    if (!$inTemplate) {
+                        $windows[] = ['start' => $o->start_datetime->toISOString(), 'end' => $o->end_datetime->toISOString()];
+                    }
+                }
+            }
+
+            $current->addDay();
+        }
+
+        usort($windows, fn ($a, $b) => $a['start'] <=> $b['start']);
+        return $windows;
     }
 }

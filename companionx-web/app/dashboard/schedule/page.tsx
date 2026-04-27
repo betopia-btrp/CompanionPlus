@@ -10,10 +10,9 @@ import {
   SlotInfo,
   EventProps,
 } from "react-big-calendar";
-import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enUS } from "date-fns/locale/en-US";
-import { Plus, Trash, VideoCamera, Clock, X } from "@phosphor-icons/react";
+import { Plus, Trash, VideoCamera, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -29,14 +28,17 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-const DnDCalendar = withDragAndDrop(Calendar) as React.ComponentType<any>;
+type Window = {
+  start_datetime: string;
+  end_datetime: string;
+};
 
-type Slot = {
+type Override = {
   id: number;
   start_datetime: string;
   end_datetime: string;
-  status: "available" | "held" | "booked" | "pending" | "confirmed";
-  source_template_id: number | null;
+  type: "available" | "blocked";
+  reason: string | null;
 };
 
 type Booking = {
@@ -57,7 +59,8 @@ type Template = {
 };
 
 type ScheduleData = {
-  slots: Slot[];
+  windows: Window[];
+  overrides: Override[];
   bookings: Booking[];
   templates: Template[];
 };
@@ -68,12 +71,12 @@ type RBCEvent = {
   start: Date;
   end: Date;
   resource: {
-    type: "slot" | "booking";
+    type: "window" | "override" | "booking";
     status: string;
-    slotId?: number;
+    overrideId?: number;
+    overrideType?: string;
     bookingId?: number;
     jitsiRoomUuid?: string;
-    sourceTemplateId?: number | null;
     patientName?: string;
     patientRef?: string;
   };
@@ -177,96 +180,64 @@ export default function SchedulePage() {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Map to RBC events
   const events: RBCEvent[] = useMemo(() => {
     if (!data) return [];
 
-    const slotEvents: RBCEvent[] = data.slots.map((slot) => ({
-      id: `slot-${slot.id}`,
-      title: `${formatTimeShort(new Date(slot.start_datetime))} – ${formatTimeShort(new Date(slot.end_datetime))}`,
-      start: new Date(slot.start_datetime),
-      end: new Date(slot.end_datetime),
-      resource: {
-        type: "slot" as const,
-        status: slot.status,
-        slotId: slot.id,
-        sourceTemplateId: slot.source_template_id,
-      },
+    const windowEvents: RBCEvent[] = (data.windows ?? []).map((w, i) => ({
+      id: `window-${i}`,
+      title: `${formatTimeShort(new Date(w.start_datetime))} – ${formatTimeShort(new Date(w.end_datetime))}`,
+      start: new Date(w.start_datetime),
+      end: new Date(w.end_datetime),
+      resource: { type: "window" as const, status: "available" },
     }));
 
-    const bookingEvents: RBCEvent[] = data.bookings.map((b) => ({
+    const overrideEvents: RBCEvent[] = (data.overrides ?? [])
+      .filter((o: any) => o.type === "blocked")
+      .map((o: any) => ({
+      id: `override-${o.id}`,
+      title: o.type === "blocked"
+        ? `Blocked${o.reason ? `: ${o.reason}` : ""}`
+        : `Extra time${o.reason ? `: ${o.reason}` : ""}`,
+      start: new Date(o.start_datetime),
+      end: new Date(o.end_datetime),
+      resource: { type: "override" as const, status: o.type === "blocked" ? "blocked" : "available", overrideId: o.id, overrideType: o.type },
+    }));
+
+    const bookingEvents: RBCEvent[] = (data.bookings ?? []).map((b: any) => ({
       id: `booking-${b.id}`,
       title: `${b.patient_ref} · ${b.status}`,
       start: new Date(b.scheduled_start),
       end: new Date(b.scheduled_end),
-      resource: {
-        type: "booking" as const,
-        status: b.status,
-        bookingId: b.id,
-        jitsiRoomUuid: b.jitsi_room_uuid,
-        patientName: b.patient_name,
-        patientRef: b.patient_ref,
-      },
+      resource: { type: "booking" as const, status: b.status, bookingId: b.id, jitsiRoomUuid: b.jitsi_room_uuid, patientName: b.patient_name, patientRef: b.patient_ref },
     }));
 
-    return [...slotEvents, ...bookingEvents];
+    return [...windowEvents, ...overrideEvents, ...bookingEvents];
   }, [data]);
 
-  // Event styling
-  const eventPropGetter = useCallback((event: RBCEvent) => {
-    if (event.resource.type === "booking") {
-      return {
-        className:
-          "!bg-primary/15 !border-primary/40 !text-primary !border !rounded-none !text-xs",
-      };
-    }
-
-    // Template-generated slot
-    if (event.resource.sourceTemplateId) {
-      switch (event.resource.status) {
-        case "available":
-          return {
-            className:
-              "!bg-sky-500/10 !border-sky-500/40 !text-sky-700 !border !border-dashed !rounded-none !text-xs",
-          };
-        case "held":
-          return {
-            className:
-              "!bg-amber-500/15 !border-amber-500/40 !text-amber-700 !border !border-dashed !rounded-none !text-xs",
-          };
-        default:
-          return {
-            className:
-              "!bg-sky-500/10 !border-sky-500/40 !text-sky-700 !border !border-dashed !rounded-none !text-xs",
-          };
+  const handleCreateOverride = useCallback(
+    async (type: "available" | "blocked") => {
+      setCreating(true);
+      try {
+        await api.post("/api/consultant/overrides", {
+          start_datetime: toUtcISO(createForm.start_datetime),
+          end_datetime: toUtcISO(createForm.end_datetime),
+          type,
+        });
+        setShowCreateModal(false);
+        setStatusMessage(type === "available" ? "Extra availability added." : "Time blocked.");
+        await fetchSchedule();
+      } catch {
+        setStatusMessage("Could not save override.");
+      } finally {
+        setCreating(false);
       }
-    }
+    },
+    [createForm, fetchSchedule],
+  );
 
-    // Manual slot
-    switch (event.resource.status) {
-      case "available":
-        return {
-          className:
-            "!bg-emerald-500/15 !border-emerald-500/40 !text-emerald-700 !border !rounded-none !text-xs",
-        };
-      case "held":
-        return {
-          className:
-            "!bg-amber-500/15 !border-amber-500/40 !text-amber-700 !border !rounded-none !text-xs",
-        };
-      default:
-        return {
-          className:
-            "!bg-primary/15 !border-primary/40 !text-primary !border !rounded-none !text-xs",
-        };
-    }
-  }, []);
-
-  // Handlers
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
     const start = slotInfo.start;
     const end = slotInfo.end;
-
     setCreateForm({
       start_datetime: toLocalInput(start),
       end_datetime: toLocalInput(end),
@@ -274,113 +245,29 @@ export default function SchedulePage() {
     setShowCreateModal(true);
   }, []);
 
-  const quickDeleteSlot = useCallback(
-    async (slotId: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      try {
-        const res = await api.delete(`/api/consultant/slots/${slotId}`);
-        setStatusMessage(res.data.message || "Slot removed.");
-        await fetchSchedule();
-      } catch (error: any) {
-        console.error("Failed to delete slot", error);
-        const msg = error.response?.data?.message || "Could not remove slot.";
-        setStatusMessage(msg);
-      }
-    },
-    [fetchSchedule],
-  );
+  const handleSelectEvent = useCallback((event: RBCEvent) => {
+    setSelectedEvent(event);
+  }, []);
 
-  const handleSelectEvent = useCallback(
-    (event: RBCEvent) => {
-      setSelectedEvent(event);
-    },
-    [],
-  );
-
-  const handleEventDrop = useCallback(
-    async ({
-      event,
-      start,
-      end,
-    }: {
-      event: RBCEvent;
-      start: Date;
-      end: Date;
-    }) => {
-      if (event.resource.type !== "slot") return;
-
-      try {
-        await api.patch(`/api/consultant/slots/${event.resource.slotId}`, {
-          start_datetime: start.toISOString(),
-          end_datetime: end.toISOString(),
-        });
-        setStatusMessage("Slot moved.");
-        await fetchSchedule();
-      } catch (error) {
-        console.error("Failed to move slot", error);
-        setStatusMessage("Could not move slot.");
-        await fetchSchedule();
-      }
-    },
-    [fetchSchedule],
-  );
-
-  const handleEventResize = useCallback(
-    async ({
-      event,
-      start,
-      end,
-    }: {
-      event: RBCEvent;
-      start: Date;
-      end: Date;
-    }) => {
-      if (event.resource.type !== "slot") return;
-
-      try {
-        await api.patch(`/api/consultant/slots/${event.resource.slotId}`, {
-          start_datetime: start.toISOString(),
-          end_datetime: end.toISOString(),
-        });
-        setStatusMessage("Slot resized.");
-        await fetchSchedule();
-      } catch (error) {
-        console.error("Failed to resize slot", error);
-        setStatusMessage("Could not resize slot.");
-        await fetchSchedule();
-      }
-    },
-    [fetchSchedule],
-  );
-
-  const handleCreateSlot = useCallback(async () => {
-    setCreating(true);
-    try {
-      await api.post("/api/consultant/slots", {
-        start_datetime: toUtcISO(createForm.start_datetime),
-        end_datetime: toUtcISO(createForm.end_datetime),
-      });
-      setShowCreateModal(false);
-      setStatusMessage("Slot created.");
-      await fetchSchedule();
-    } catch (error) {
-      console.error("Failed to create slot", error);
-      setStatusMessage("Could not create slot. Check for overlap.");
-    } finally {
-      setCreating(false);
+  const eventPropGetter = useCallback((event: RBCEvent) => {
+    if (event.resource.type === "booking") {
+      return { className: "!bg-primary/15 !border-primary/40 !text-primary !border !rounded-none !text-xs" };
     }
-  }, [createForm, fetchSchedule]);
+    if (event.resource.type === "override") {
+      return { className: "!bg-red-500/10 !border-red-500/40 !text-red-700 !border !rounded-none !text-xs" };
+    }
+    return { className: "!bg-emerald-500/10 !border-emerald-500/30 !text-emerald-700 !border !border-dashed !rounded-none !text-xs" };
+  }, []);
 
-  const handleDeleteSlot = useCallback(
-    async (slotId: number) => {
+  const handleDeleteOverride = useCallback(
+    async (overrideId: number) => {
       try {
-        const res = await api.delete(`/api/consultant/slots/${slotId}`);
+        const res = await api.delete(`/api/consultant/overrides/${overrideId}`);
         setSelectedEvent(null);
-        setStatusMessage(res.data.message || "Slot removed.");
+        setStatusMessage(res.data.message || "Override removed.");
         await fetchSchedule();
       } catch (error: any) {
-        console.error("Failed to delete slot", error);
-        const msg = error.response?.data?.message || "Could not remove slot.";
+        const msg = error.response?.data?.message || "Could not remove override.";
         setStatusMessage(msg);
       }
     },
@@ -450,20 +337,14 @@ export default function SchedulePage() {
           {event.resource.type === "booking" && (
             <VideoCamera size={10} weight="bold" className="shrink-0" />
           )}
+          {event.resource.type === "override" && event.resource.overrideType === "blocked" && (
+            <X size={10} weight="bold" className="shrink-0" />
+          )}
           <span className="truncate text-[11px] font-medium">{event.title}</span>
         </div>
-        {event.resource.type === "slot" && (
-          <button
-            onClick={(e) => quickDeleteSlot(event.resource.slotId!, e)}
-            className="shrink-0 p-0.5 text-muted-foreground hover:text-destructive"
-            title="Delete slot"
-          >
-            <Trash size={10} weight="bold" />
-          </button>
-        )}
       </div>
     );
-  }, [quickDeleteSlot]);
+  }, []);
 
   // Group templates by day for display
   const templatesByDay = useMemo(() => {
@@ -478,7 +359,7 @@ export default function SchedulePage() {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
-        {/* ── Header ──────────────────────────────────────────────── */}
+        {/*  Header  */}
         <header className="mb-6 flex items-center justify-between">
           <div>
             <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
@@ -518,7 +399,7 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* ── Templates Bar ───────────────────────────────────────── */}
+        {/*  Templates Bar  */}
         {data?.templates && data.templates.length > 0 && (
           <div className="mb-4 border border-border bg-card px-5 py-3 flex items-center gap-4 flex-wrap">
             <span className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
@@ -548,7 +429,7 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* ── Calendar ─────────────────────────────────────────────── */}
+        {/*  Calendar  */}
         <div className="border border-border bg-card p-4">
           {loading ? (
             <div className="h-[600px] flex items-center justify-center">
@@ -557,7 +438,8 @@ export default function SchedulePage() {
               </div>
             </div>
           ) : (
-            <DnDCalendar
+            <Calendar
+              key={toDateString(currentDate)}
               localizer={localizer}
               events={events}
               startAccessor="start"
@@ -569,12 +451,9 @@ export default function SchedulePage() {
               onNavigate={(date: Date) => setCurrentDate(date)}
               onSelectSlot={handleSelectSlot}
               onSelectEvent={handleSelectEvent}
-              onEventDrop={handleEventDrop}
-              onEventResize={handleEventResize}
               eventPropGetter={eventPropGetter}
               components={{ event: EventComponent }}
               selectable
-              resizable
               step={30}
               timeslots={1}
               min={new Date(2024, 0, 1, 0, 0)}
@@ -583,12 +462,12 @@ export default function SchedulePage() {
               views={["day", "week", "month"]}
               toolbar
               popup
-              scrollToTime={new Date(2024, 0, 1, 8, 0)}
+              scrollToTime={new Date(2024, 0, 1, 6, 0)}
             />
           )}
         </div>
 
-        {/* ── Event Popover ───────────────────────────────────────── */}
+        {/*  Event Popover  */}
         {selectedEvent && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -598,56 +477,34 @@ export default function SchedulePage() {
               className="w-full max-w-sm border border-border bg-card p-6"
               onClick={(e) => e.stopPropagation()}
             >
-              {selectedEvent.resource.type === "slot" ? (
+              {selectedEvent.resource.type === "override" ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Clock size={16} weight="bold" className={selectedEvent.resource.sourceTemplateId ? "text-sky-600" : "text-emerald-600"} />
+                      <X size={16} weight="bold" className={selectedEvent.resource.overrideType === "blocked" ? "text-red-600" : "text-emerald-600"} />
                       <span className="font-sans text-sm font-medium text-foreground">
-                        {selectedEvent.resource.sourceTemplateId ? "Template Slot" : "Manual Slot"}
+                        {selectedEvent.resource.overrideType === "blocked" ? "Blocked Time" : "Extra Availability"}
                       </span>
                     </div>
-                    <span
-                      className={`font-sans text-[10px] font-medium uppercase tracking-wider border px-1.5 py-0.5 ${
-                        selectedEvent.resource.status === "available"
-                          ? "border-emerald-500/40 text-emerald-700 bg-emerald-500/10"
-                          : "border-amber-500/40 text-amber-700 bg-amber-500/10"
-                      }`}
-                    >
-                      {selectedEvent.resource.status}
-                    </span>
                   </div>
                   <p className="font-sans text-xs text-muted-foreground mb-1">
                     {format(selectedEvent.start, "EEE, MMM d")}
                   </p>
                   <p className="font-sans text-sm font-medium text-foreground mb-5">
-                    {formatTimeShort(selectedEvent.start)} –{" "}
-                    {formatTimeShort(selectedEvent.end)}
+                    {formatTimeShort(selectedEvent.start)} – {formatTimeShort(selectedEvent.end)}
                   </p>
                   <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs font-medium"
-                      onClick={() => setSelectedEvent(null)}
-                    >
+                    <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => setSelectedEvent(null)}>
                       Close
                     </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10"
-                      variant="outline"
-                      onClick={() => {
-                        handleDeleteSlot(selectedEvent.resource.slotId!);
-                        setSelectedEvent(null);
-                      }}
-                    >
+                    <Button size="sm" className="flex-1 text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10" variant="outline"
+                      onClick={() => { handleDeleteOverride(selectedEvent.resource.overrideId!); setSelectedEvent(null); }}>
                       <Trash size={12} weight="bold" />
-                      Delete
+                      Remove
                     </Button>
                   </div>
                 </>
-              ) : (
+              ) : selectedEvent.resource.type === "booking" ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -695,75 +552,53 @@ export default function SchedulePage() {
                     )}
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         )}
 
-        {/* ── Create Slot Modal ───────────────────────────────────── */}
+        {/*  Create Override Modal  */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="w-full max-w-sm border border-border bg-card p-6">
               <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
-                Create Slot
+                Override Availability
               </h2>
+              <p className="font-sans text-xs text-muted-foreground mb-4">
+                Add extra availability or block time for this slot.
+              </p>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="font-sans text-xs text-muted-foreground">
-                    Start
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={createForm.start_datetime}
-                    onChange={(e) =>
-                      setCreateForm({
-                        ...createForm,
-                        start_datetime: e.target.value,
-                      })
-                    }
+                  <label className="font-sans text-xs text-muted-foreground">Start</label>
+                  <Input type="datetime-local" value={createForm.start_datetime}
+                    onChange={(e) => setCreateForm({ ...createForm, start_datetime: e.target.value })}
                     className="mt-1 text-xs"
                   />
                 </div>
                 <div>
-                  <label className="font-sans text-xs text-muted-foreground">
-                    End
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={createForm.end_datetime}
-                    onChange={(e) =>
-                      setCreateForm({
-                        ...createForm,
-                        end_datetime: e.target.value,
-                      })
-                    }
+                  <label className="font-sans text-xs text-muted-foreground">End</label>
+                  <Input type="datetime-local" value={createForm.end_datetime}
+                    onChange={(e) => setCreateForm({ ...createForm, end_datetime: e.target.value })}
                     className="mt-1 text-xs"
                   />
                 </div>
               </div>
               <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 text-xs font-medium"
-                  onClick={() => setShowCreateModal(false)}
-                >
+                <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => setShowCreateModal(false)}>
                   Cancel
                 </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 text-xs font-medium"
-                  onClick={handleCreateSlot}
-                  disabled={creating}
-                >
-                  {creating ? "Creating..." : "Create Slot"}
+                <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => handleCreateOverride("blocked")} disabled={creating}>
+                  {creating ? "Saving..." : "Block Time"}
+                </Button>
+                <Button size="sm" className="flex-1 text-xs font-medium" onClick={() => handleCreateOverride("available")} disabled={creating}>
+                  {creating ? "Saving..." : "Add Available"}
                 </Button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Template Modal ─────────────────────────────────────── */}
+        {/*  Template Modal  */}
         {showTemplateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="w-full max-w-lg border border-border bg-card p-6">
@@ -862,7 +697,7 @@ export default function SchedulePage() {
         )}
       </div>
 
-      {/* ── RBC overrides to match design system ─────────────────── */}
+      {/*  RBC overrides to match design system  */}
       <style jsx global>{`
         .rbc-calendar {
           font-family: inherit;
