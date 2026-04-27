@@ -138,11 +138,12 @@ class ConsultantDashboardController extends Controller
         $end = Carbon::parse($validated['end_date'])->endOfDay();
 
         $slots = AvailabilitySlot::where('consultant_id', $profile->user_id)
-            ->active() // Only get active slots
+            ->active()
             ->whereBetween('start_datetime', [$start, $end])
             ->with('activeBooking')
             ->orderBy('start_datetime')
             ->get()
+            ->reject(fn (AvailabilitySlot $slot) => $slot->hasConfirmedBookings())
             ->map(fn (AvailabilitySlot $slot) => [
                 'id' => $slot->id,
                 'start_datetime' => optional($slot->start_datetime)->toISOString(),

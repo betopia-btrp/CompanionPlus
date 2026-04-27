@@ -144,6 +144,8 @@ class BookingFlowController extends Controller
                 $request->input('cancel_url', url('/dashboard/booking/' . $consultant->user_id))
             );
 
+            $booking->update(['stripe_session_id' => $session->id]);
+
             return response()->json([
                 'url' => $session->url,
                 'session_id' => $session->id,
@@ -156,7 +158,6 @@ class BookingFlowController extends Controller
     {
         $validated = $request->validate([
             'session_id' => 'required|string',
-            'booking_id' => 'required|integer|exists:bookings,id',
         ]);
 
         $session = $this->stripe->retrieveCheckoutSession($validated['session_id']);
@@ -166,7 +167,8 @@ class BookingFlowController extends Controller
         }
 
         $user = $request->user();
-        $booking = Booking::where('id', $validated['booking_id'])
+
+        $booking = Booking::where('stripe_session_id', $validated['session_id'])
             ->where('patient_id', $user->id)
             ->firstOrFail();
 
@@ -260,6 +262,7 @@ class BookingFlowController extends Controller
                     'scheduled_end' => $b->scheduled_end?->toISOString(),
                     'price_at_booking' => (float) $b->price_at_booking,
                     'jitsi_room_uuid' => $b->jitsi_room_uuid,
+                    'stripe_session_id' => $b->stripe_session_id,
                     'is_first_time' => $isPatient ? false : Booking::query()
                         ->where('patient_id', $b->patient_id)
                         ->where('consultant_id', $b->consultant_id)

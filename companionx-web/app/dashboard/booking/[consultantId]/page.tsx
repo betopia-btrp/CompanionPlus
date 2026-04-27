@@ -20,6 +20,7 @@ import {
   VideoCamera,
 } from "@phosphor-icons/react";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import { toast } from "sonner";
 
 const locales = { "en-US": enUS };
 const localizer = dateFnsLocalizer({
@@ -75,7 +76,6 @@ export default function ConsultantBookingPage() {
   const [selection, setSelection] = useState<{ start: Date; end: Date } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>("week");
 
@@ -88,31 +88,28 @@ export default function ConsultantBookingPage() {
   }, [consultantId, router]);
 
   const sessionId = searchParams.get("session_id");
-  const returnBookingId = searchParams.get("booking_id");
 
   useEffect(() => {
-    if (sessionId && returnBookingId && !completeLoading && !message) {
+    if (sessionId && !completeLoading) {
       setCompleteLoading(true);
       api
         .post("/api/bookings/complete", {
           session_id: sessionId,
-          booking_id: returnBookingId,
         })
         .then(() => {
-          setMessage("Payment successful! Your session is confirmed.");
+          toast.success("Payment successful! Your session is confirmed.");
         })
         .catch(() => {
-          setMessage("Payment verification failed. Please contact support.");
+          toast.error("Payment verification failed. Please contact support.");
         })
         .finally(() => {
           setCompleteLoading(false);
           const url = new URL(window.location.href);
           url.searchParams.delete("session_id");
-          url.searchParams.delete("booking_id");
           window.history.replaceState({}, "", url.pathname);
         });
     }
-  }, [sessionId, returnBookingId]);
+  }, [sessionId]);
 
   const events: RBCEvent[] = useMemo(() => {
     if (!data) return [];
@@ -162,19 +159,19 @@ export default function ConsultantBookingPage() {
         consultant_id: Number(consultantId),
         scheduled_start: selection.start.toISOString(),
         scheduled_end: selection.end.toISOString(),
-        success_url: `${window.location.origin}/dashboard/booking/${consultantId}?session_id={CHECKOUT_SESSION_ID}&booking_id={BOOKING_ID}`,
+        success_url: `${window.location.origin}/dashboard/booking/${consultantId}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${window.location.origin}/dashboard/booking/${consultantId}`,
       });
 
       if (res.data.free_session) {
-        setMessage("Session booked with your free session credit!");
+        toast.success("Session booked with your free session credit!");
         setSelection(null);
         setCheckoutLoading(false);
       } else {
         window.location.href = res.data.url;
       }
     } catch {
-      setMessage("Failed to initiate checkout.");
+      toast.error("Failed to initiate checkout.");
       setCheckoutLoading(false);
     }
   };
@@ -241,7 +238,7 @@ export default function ConsultantBookingPage() {
               </p>
               <div className="mt-3 flex items-center gap-1 font-sans text-xs text-muted-foreground">
                 <Star size={12} weight="fill" className="text-amber-500" />
-                {c.average_rating || "5.0"}
+                {c.average_rating ?? "—"}
               </div>
             </div>
             <div className="text-right">
@@ -259,26 +256,6 @@ export default function ConsultantBookingPage() {
             </p>
           )}
         </div>
-
-        {/* ── Message ────────────────────────────────────────────── */}
-        {message && (
-          <div
-            className={`mb-6 border p-4 text-center font-sans text-sm ${
-              completeLoading
-                ? "border-primary/40 bg-primary/5 text-foreground"
-                : "border-primary/60 bg-primary/10 text-foreground"
-            }`}
-          >
-            {completeLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Spinner size={16} className="animate-spin" />
-                Verifying payment...
-              </span>
-            ) : (
-              message
-            )}
-          </div>
-        )}
 
         {/* ── Calendar + Selection ────────────────────────────────── */}
         <div className="grid gap-8 lg:grid-cols-3">
@@ -322,9 +299,6 @@ export default function ConsultantBookingPage() {
             {selection ? (
               <div className="space-y-4">
                 <div>
-                  <p className="font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                    Date & Time
-                  </p>
                   <p className="mt-1 font-heading text-base font-medium text-foreground">
                     {formatDate(selection.start)}
                   </p>
@@ -333,10 +307,13 @@ export default function ConsultantBookingPage() {
                     {formatTime(selection.end)}
                   </p>
                   <p className="mt-1 font-sans text-xs text-muted-foreground">
-                    {(selection.end.getTime() - selection.start.getTime()) / 3600000} hr
-                    {Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60 > 0
-                      ? ` ${Math.round((selection.end.getTime() - selection.start.getTime()) / 60000) % 60} min`
-                      : ""}
+                    {(() => {
+                      const mins = Math.round((selection.end.getTime() - selection.start.getTime()) / 60000);
+                      if (mins < 60) return `${mins} min`;
+                      const h = Math.floor(mins / 60);
+                      const m = mins % 60;
+                      return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
+                    })()}
                     {" "}× ৳{c.base_rate_bdt}/hr
                   </p>
                 </div>

@@ -11,9 +11,13 @@ use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\ConsultantController;
 use App\Http\Controllers\Api\ExerciseController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SessionNoteController;
+use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\StripeWebhookController;
 
 Route::post("/register", [AuthController::class, "register"]);
 Route::post("/login", [AuthController::class, "login"]);
+Route::post("/webhooks/stripe", [StripeWebhookController::class, "handle"]);
 
 Route::middleware("auth:sanctum")->group(function () {
     Route::post("/logout", [AuthController::class, "logout"]);
@@ -23,6 +27,7 @@ Route::middleware("auth:sanctum")->group(function () {
     });
     Route::get("/profile", [App\Http\Controllers\Api\ProfileController::class, "show"]);
     Route::patch("/profile", [App\Http\Controllers\Api\ProfileController::class, "update"]);
+    Route::get("/reviews/consultant/{consultantId}", [ReviewController::class, "consultantReviews"]);
 
     Route::get("/subscription/plans", [SubscriptionController::class, "index"]);
     Route::post("/subscription/checkout", [SubscriptionController::class, "checkout"]);
@@ -33,6 +38,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post("/onboarding", [OnboardingController::class, "store"]);
         Route::get("/dashboard/summary", [DashboardController::class, "getDashboardSummary"]);
         Route::get("/dashboard/next-appointment", [DashboardController::class, "getNextAppointment"]);
+        Route::post("/reviews", [ReviewController::class, "store"]);
         Route::get("/consultants", [ConsultantController::class, "index"]);
         Route::get("/consultants/{consultantId}", [ConsultantController::class, "show"]);
         Route::get("/consultants/{consultantId}/slots", [
@@ -92,6 +98,14 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::patch("/consultant/profile", [
             ConsultantDashboardController::class,
             "updateProfile",
+        ]);
+        Route::get("/consultant/session-notes/{bookingId}", [
+            SessionNoteController::class,
+            "show",
+        ]);
+        Route::put("/consultant/session-notes/{bookingId}", [
+            SessionNoteController::class,
+            "update",
         ]);
         Route::post("/consultant/slots", [
             ConsultantDashboardController::class,
