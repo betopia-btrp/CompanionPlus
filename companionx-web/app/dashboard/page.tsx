@@ -5,15 +5,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  Barbell,
   Brain,
-  CalendarDots,
   Crown,
   Spinner,
-  Star,
   TrendUp,
   VideoCamera,
-  WarningCircle,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/axios";
@@ -83,6 +79,20 @@ type DashboardData = {
   exercise: ExerciseData | null;
 };
 
+type BlogPost = {
+  id: number;
+  title: string;
+  slug: string;
+  content?: string;
+  excerpt: string | null;
+  cover_image_url: string | null;
+  created_at: string;
+  author?: {
+    first_name: string;
+    last_name: string;
+  };
+};
+
 function getTimeUntil(iso: string, now: number = Date.now()) {
   const diff = new Date(iso).getTime() - now;
   if (diff < 0) return "00:00:00";
@@ -121,7 +131,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [blogsLoading, setBlogsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -164,6 +176,19 @@ export default function DashboardPage() {
           setLoading(false);
           router.push("/login");
         }
+      });
+
+    // Fetch consultant blogs for all users
+    api
+      .get("/api/blogs")
+      .then((res) => {
+        if (!ignore) setBlogs(res.data.data || res.data.blogs || []);
+      })
+      .catch(() => {
+        if (!ignore) setBlogs([]);
+      })
+      .finally(() => {
+        if (!ignore) setBlogsLoading(false);
       });
 
     return () => {
@@ -431,6 +456,64 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* ── Consultant Blogs ─────────────────────────────────────── */}
+        <section className="mb-8">
+          <div className="mb-5 flex items-center gap-2">
+            <Brain size={16} weight="bold" className="text-primary" />
+            <h2 className="font-heading text-base font-semibold text-foreground">
+              Consultant Blogs
+            </h2>
+          </div>
+
+          {blogsLoading ? (
+            <div className="border border-border bg-card p-8 text-center">
+              <Spinner size={24} className="animate-spin text-muted-foreground mx-auto" />
+              <p className="mt-2 font-sans text-xs text-muted-foreground">Loading blogs…</p>
+            </div>
+          ) : blogs.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {blogs.map((blog) => (
+                <div key={blog.id} className="flex flex-col border border-border bg-card">
+                  {blog.cover_image_url && (
+                    <div className="h-36 w-full bg-cover bg-center" style={{ backgroundImage: `url(${blog.cover_image_url})` }} />
+                  )}
+                  <div className="flex-1 p-5">
+                    <p className="mb-1.5 font-sans text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                      {blog.author?.first_name} {blog.author?.last_name}
+                    </p>
+                    <h3 className="mb-2 font-heading text-sm font-semibold text-foreground">
+                      {blog.title}
+                    </h3>
+                    <p className="font-sans text-xs leading-relaxed text-muted-foreground">
+                      {blog.excerpt || blog.content?.slice(0, 120) + (blog.content?.length > 120 ? "…" : "")}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                    <span className="font-sans text-xs text-muted-foreground">
+                      {new Date(blog.created_at).toLocaleDateString()}
+                    </span>
+                    <button
+                      className="font-sans text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80 transition-opacity"
+                      onClick={() => router.push("/dashboard/corner")}
+                    >
+                      Read More
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-border bg-card p-8 text-center">
+              <p className="mb-1 font-heading text-sm font-medium text-foreground">
+                No consultant blogs yet
+              </p>
+              <p className="mx-auto max-w-sm font-sans text-xs text-muted-foreground">
+                Check back soon for insights and advice from our consultants.
+              </p>
+            </div>
+          )}
+        </section>
+
         {/* ── AI-Generated Exercises ─────────────────────────────────── */}
         <section className="mb-8">
           <div className="mb-5 flex items-center gap-2">
@@ -666,7 +749,7 @@ function ConsultantDashboard() {
 
             {today_schedule.length > 0 ? (
               <div>
-                {today_schedule.map((session, i) => {
+                {today_schedule.map((session) => {
                   const startTime = new Date(session.scheduled_start);
                   const endTime = new Date(session.scheduled_end);
                   const isCurrent =

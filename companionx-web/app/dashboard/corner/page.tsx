@@ -15,7 +15,6 @@ type Author = {
   id: number;
   first_name: string;
   last_name: string;
-  avatar_url: string | null;
 };
 
 type BlogPost = {
@@ -81,7 +80,11 @@ export default function BlogsPage() {
   };
 
   useEffect(() => {
-    fetchBlogs(page);
+    const timeout = window.setTimeout(() => {
+      void fetchBlogs(page);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [page]);
 
   const openPost = async (post: BlogPost) => {

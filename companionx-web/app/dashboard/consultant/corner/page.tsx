@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import api from "@/lib/axios";
-import { ArrowLeft, Plus, Trash, PencilSimple } from "@phosphor-icons/react";
-import { Eye, Save, LoaderCircle } from "lucide-react";
+import { Plus, Trash, PencilSimple } from "@phosphor-icons/react";
+import { Save, LoaderCircle } from "lucide-react";
 
 type BlogPost = {
   id: number;
@@ -32,7 +30,7 @@ export default function ConsultantsCornerPage() {
     content: "",
     excerpt: "",
     cover_image_url: "",
-    status: "draft" as "draft" | "published",
+    status: "published" as "draft" | "published",
   });
 
   const fetchPosts = async () => {
@@ -47,7 +45,11 @@ export default function ConsultantsCornerPage() {
   };
 
   useEffect(() => {
-    fetchPosts();
+    const timeout = window.setTimeout(() => {
+      void fetchPosts();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const openEditor = (post?: BlogPost) => {
@@ -70,7 +72,7 @@ export default function ConsultantsCornerPage() {
         content: "",
         excerpt: "",
         cover_image_url: "",
-        status: "draft",
+        status: "published",
       });
     }
     setEditorOpen(true);

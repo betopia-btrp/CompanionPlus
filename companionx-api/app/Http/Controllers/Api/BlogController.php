@@ -14,7 +14,7 @@ class BlogController extends Controller
     public function index(Request $request)
     {
         $blogs = BlogPost::where('status', 'published')
-            ->with('author:id,first_name,last_name,avatar_url')
+            ->with('author:id,first_name,last_name')
             ->select([
                 'id',
                 'author_id',
@@ -67,7 +67,9 @@ class BlogController extends Controller
     // GET /api/blogs/{slug} - View single blog
     public function show(Request $request, string $slug)
     {
-        $blog = BlogPost::where('slug', $slug)->firstOrFail();
+        $blog = BlogPost::with('author:id,first_name,last_name')
+            ->where('slug', $slug)
+            ->firstOrFail();
 
         if ($request->user()?->system_role === 'patient' && $blog->status !== 'published') {
             abort(403, 'This post is not published yet.');
@@ -107,7 +109,7 @@ class BlogController extends Controller
                 'content' => $request->content,
                 'excerpt' => $request->excerpt,
                 'cover_image_url' => $request->cover_image_url,
-                'status' => $request->status ?? 'draft',
+                'status' => $request->status ?? 'published',
             ]);
 
             return response()->json($blog, 201);
