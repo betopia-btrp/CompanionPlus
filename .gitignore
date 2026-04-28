@@ -1,2 +1,5 @@
 TASKS.md
 db_schema.sql
+.env
+.env.local
+.env.production

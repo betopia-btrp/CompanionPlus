@@ -7,6 +7,7 @@ use App\Jobs\GenerateConsultantRecommendations;
 use App\Jobs\GenerateOnboardingExercises;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\Transaction;
 use App\Services\StripeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -119,6 +120,16 @@ class SubscriptionController extends Controller
 
             $user->subscription_plan_id = $plan->id;
             $user->save();
+
+            Transaction::create([
+                'subscription_id' => $newSub->id,
+                'user_id' => $user->id,
+                'type' => 'subscription',
+                'status' => 'succeeded',
+                'stripe_reference_id' => $session->payment_intent,
+                'total_amount' => $plan->price,
+                'currency' => 'usd',
+            ]);
         });
 
         if ($previousPlan?->price == 0 && $plan->price > 0) {

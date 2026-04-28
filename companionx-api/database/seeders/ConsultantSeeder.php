@@ -77,7 +77,7 @@ class ConsultantSeeder extends Seeder
                 $names = explode(" ", $c["name"]);
                 $user = User::updateOrCreate(
                     [
-                        "email" => "consultant{$index}@companionx.com",
+                        "email" => "consultant{$index}@gmail.com",
                     ],
                     [
                         "first_name" => $names[0],

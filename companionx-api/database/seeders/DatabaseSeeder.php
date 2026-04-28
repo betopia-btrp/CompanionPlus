@@ -19,12 +19,12 @@ class DatabaseSeeder extends Seeder
             ->first();
 
         $user = User::updateOrCreate(
-            ['email' => 'test@example.com'],
+            ['email' => 'user@gmail.com'],
             [
                 'first_name' => 'Test',
                 'last_name' => 'User',
                 'phone' => '01700000000',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('password123'),
                 'dob' => '2000-01-01',
                 'gender' => 'other',
                 'guardian_contact' => null,

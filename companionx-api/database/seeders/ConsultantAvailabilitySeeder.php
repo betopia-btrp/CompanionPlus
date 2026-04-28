@@ -14,12 +14,12 @@ class ConsultantAvailabilitySeeder extends Seeder
     public function run(): void
     {
         $demoUser = User::updateOrCreate(
-            ['email' => 'demo.consultant@companionx.com'],
+            ['email' => 'demo.consultant@gmail.com'],
             [
                 'first_name' => 'Demo',
                 'last_name' => 'Consultant',
                 'phone' => '01900000099',
-                'password' => Hash::make('DemoPass123!'),
+                'password' => Hash::make('password123'),
                 'dob' => '1990-01-01',
                 'gender' => 'other',
                 'guardian_contact' => null,

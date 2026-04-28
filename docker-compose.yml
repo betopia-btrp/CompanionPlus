@@ -1,0 +1,82 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: companionx-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: companionx
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: companionx
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./companionx-api
+      dockerfile: Dockerfile
+    container_name: companionx-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: companionx
+      DB_USERNAME: postgres
+      DB_PASSWORD: companionx
+    volumes:
+      - ./companionx-api:/app
+      - api_vendor:/app/vendor
+    depends_on:
+      db:
+        condition: service_healthy
+
+  queue:
+    build:
+      context: ./companionx-api
+      dockerfile: Dockerfile
+    container_name: companionx-queue
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: companionx
+      DB_USERNAME: postgres
+      DB_PASSWORD: companionx
+      SKIP_MIGRATIONS: "true"
+    volumes:
+      - ./companionx-api:/app
+      - api_vendor:/app/vendor
+    depends_on:
+      - api
+    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=3"]
+
+  web:
+    build:
+      context: ./companionx-web
+      dockerfile: Dockerfile
+    container_name: companionx-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    volumes:
+      - ./companionx-web:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  api_vendor:
+  web_node_modules:
+  web_next:

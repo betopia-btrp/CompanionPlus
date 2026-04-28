@@ -9,6 +9,7 @@ class Transaction extends Model
 {
     protected $fillable = [
         'booking_id',
+        'subscription_id',
         'user_id',
         'type',
         'status',
@@ -33,6 +34,11 @@ class Transaction extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(Subscription::class);
     }
 
     public function user(): BelongsTo
