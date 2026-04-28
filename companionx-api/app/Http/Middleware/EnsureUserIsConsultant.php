@@ -10,10 +10,19 @@ class EnsureUserIsConsultant
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user() && $request->user()->system_role === 'consultant') {
-            return $next($request);
+        $user = $request->user();
+
+        if (!$user || $user->system_role !== 'consultant') {
+            return response()->json(['message' => 'Access denied. Consultant role required.'], 403);
         }
 
-        return response()->json(['message' => 'Access denied. Consultant role required.'], 403);
+        if (!$user->consultantProfile?->is_approved) {
+            $isProfileRoute = $request->is('api/consultant/profile') || $request->is('api/consultant/dashboard');
+            if (!$isProfileRoute) {
+                return response()->json(['message' => 'Consultant not yet approved.'], 403);
+            }
+        }
+
+        return $next($request);
     }
 }

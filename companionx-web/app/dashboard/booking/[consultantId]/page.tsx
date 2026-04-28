@@ -71,8 +71,9 @@ export default function ConsultantBookingPage() {
   const router = useRouter();
   const consultantId = params.consultantId as string;
 
-  const [data, setData] = useState<ConsultantData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [consultant, setConsultant] = useState<ConsultantData["consultant"] | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
   const [selection, setSelection] = useState<{ start: Date; end: Date } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
@@ -80,18 +81,44 @@ export default function ConsultantBookingPage() {
   const [currentView, setCurrentView] = useState<View>("week");
   const [freeSessions, setFreeSessions] = useState(0);
 
+  const dateRange = useMemo(() => {
+    const d = currentDate;
+    let start: Date, end: Date;
+    if (currentView === "day") {
+      start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+    } else {
+      const dayOfWeek = d.getDay();
+      start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayOfWeek);
+      end = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayOfWeek + 6, 23, 59, 59);
+    }
+    return {
+      start: start.toISOString().split("T")[0],
+      end: end.toISOString().split("T")[0],
+    };
+  }, [currentDate, currentView]);
+
   useEffect(() => {
-    Promise.all([
-      api.get(`/api/consultants/${consultantId}`),
-      api.get("/api/me"),
-    ])
-      .then(([consultantRes, userRes]) => {
-        setData(consultantRes.data);
-        setFreeSessions(userRes.data.free_sessions_remaining ?? 0);
-      })
-      .catch(() => router.push("/dashboard/booking"))
-      .finally(() => setLoading(false));
+    setLoadingSlots(true);
+    api.get(`/api/consultants/${consultantId}`, {
+      params: { start_date: dateRange.start, end_date: dateRange.end },
+    })
+      .then((res) => setSlots(res.data.slots ?? []))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false));
+  }, [consultantId, dateRange]);
+
+  useEffect(() => {
+    api.get(`/api/consultants/${consultantId}`)
+      .then((res) => setConsultant(res.data.consultant))
+      .catch(() => router.push("/dashboard/booking"));
   }, [consultantId, router]);
+
+  useEffect(() => {
+    api.get("/api/me").then((res) => {
+      setFreeSessions(res.data.free_sessions_remaining ?? 0);
+    });
+  }, []);
 
   const sessionId = searchParams.get("session_id");
 
@@ -104,6 +131,7 @@ export default function ConsultantBookingPage() {
         })
         .then(() => {
           toast.success("Payment successful! Your session is confirmed.");
+          router.push("/dashboard/bookings?tab=confirmed");
         })
         .catch(() => {
           toast.error("Payment verification failed. Please contact support.");
@@ -118,8 +146,7 @@ export default function ConsultantBookingPage() {
   }, [sessionId]);
 
   const events: RBCEvent[] = useMemo(() => {
-    if (!data) return [];
-    const slotEvents: RBCEvent[] = data.slots.map((slot) => ({
+    const slotEvents: RBCEvent[] = slots.map((slot) => ({
       id: `slot-${slot.id}`,
       title: "Available",
       start: new Date(slot.start_datetime),
@@ -138,11 +165,11 @@ export default function ConsultantBookingPage() {
     }
 
     return slotEvents;
-  }, [data, selection]);
+  }, [slots, selection]);
 
   const handleSelectSlot = (slotInfo: SlotInfo) => {
     const { start, end } = slotInfo;
-    const isWithinSlot = data?.slots.some(
+    const isWithinSlot = slots.some(
       (s) =>
         new Date(s.start_datetime) <= start && new Date(s.end_datetime) >= end,
     );
@@ -173,6 +200,7 @@ export default function ConsultantBookingPage() {
         toast.success("Session booked with your free session credit!");
         setSelection(null);
         setCheckoutLoading(false);
+        router.push("/dashboard/bookings?tab=confirmed");
       } else {
         window.location.href = res.data.url;
       }
@@ -208,7 +236,7 @@ export default function ConsultantBookingPage() {
     };
   };
 
-  if (loading) {
+  if (loadingSlots && !consultant) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-background">
         <Spinner size={24} className="animate-spin text-muted-foreground" />
@@ -216,9 +244,9 @@ export default function ConsultantBookingPage() {
     );
   }
 
-  if (!data) return null;
+  if (!consultant) return null;
 
-  const c = data.consultant;
+  const c = consultant;
   const sel = selection;
   const totalMinutes = sel ? Math.round((sel.end.getTime() - sel.start.getTime()) / 60000) : 0;
   const hours = totalMinutes / 60;
@@ -294,7 +322,11 @@ export default function ConsultantBookingPage() {
               view={currentView}
               date={currentDate}
               onView={(v: View) => setCurrentView(v)}
-              onNavigate={(d: Date) => setCurrentDate(d)}
+              onNavigate={(d: Date) => {
+                setCurrentDate(d);
+                setSelection(null);
+                setSlots([]);
+              }}
               views={["week", "day"]}
               selectable
               onSelectSlot={handleSelectSlot}

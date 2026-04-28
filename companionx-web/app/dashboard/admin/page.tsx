@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminPageShell
-      eyebrow="Admin Console"
+      eyebrow=""
       title="Operations Overview"
       description="Monitor platform health, user activity, safety escalations, and consultant operations from one control surface."
     >
@@ -76,7 +76,6 @@ export default function AdminDashboardPage() {
         <AdminStatCard label="Open Alerts" value={data.stats.open_safety_alerts} detail="Safety items needing review" tone={data.stats.open_safety_alerts > 0 ? "danger" : "default"} />
         <AdminStatCard label="Active Sessions" value={data.stats.active_bookings} detail="Upcoming or in-progress bookings" />
         <AdminStatCard label="Published Posts" value={data.stats.published_posts} detail="Consultant's Corner articles" />
-        <AdminStatCard label="System Status" value="Live" detail="Admin frontend ready" tone="success" />
       </div>
 
       {error && <div className="mb-6 border border-amber-500/30 bg-amber-500/5 p-4 font-sans text-xs text-amber-700">{error}</div>}

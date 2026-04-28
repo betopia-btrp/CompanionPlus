@@ -42,7 +42,7 @@ const patientNav = [
   { title: "My Sessions", href: "/dashboard/bookings", icon: Clock },
   { title: "Journal", href: "/dashboard/journal", icon: BookOpen },
   { title: "Exercises", href: "/dashboard/exercises", icon: Brain },
-  { title: "Consultant's Corner", href: "/dashboard/corner", icon: Article },
+  { title: "Blogs", href: "/dashboard/corner", icon: Article },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
 
@@ -50,7 +50,7 @@ const consultantNav = [
   { title: "Dashboard", href: "/dashboard", icon: House },
   { title: "Schedule", href: "/dashboard/schedule", icon: CalendarBlank },
   { title: "Bookings", href: "/dashboard/bookings", icon: BookOpen },
-  { title: "Consultant's Corner", href: "/dashboard/consultant/corner", icon: Article },
+  { title: "Blogs", href: "/dashboard/consultant/corner", icon: Article },
   { title: "Earnings", href: "/dashboard/earnings", icon: Wallet },
   { title: "Session Room", href: "/dashboard/room", icon: VideoCamera },
 ];
@@ -114,9 +114,14 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => {
+                const hasDeeperNavItem = nav.some(
+                  (other) => other.href !== item.href && other.href.startsWith(item.href + "/"),
+                );
+
                 const isActive =
                   pathname === item.href ||
-                  (item.href !== "/dashboard" &&
+                  (!hasDeeperNavItem &&
+                    item.href !== "/dashboard" &&
                     pathname.startsWith(item.href + "/"));
 
                 return (

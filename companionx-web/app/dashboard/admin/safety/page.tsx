@@ -8,6 +8,7 @@ import { getCollection, useAdminResource } from "../_lib/use-admin-resource";
 type SafetyAlert = {
   id: number;
   patient_name: string;
+  guardian_contact?: string | null;
   severity: string;
   status: string;
   excerpt: string | null;
@@ -31,7 +32,7 @@ export default function AdminSafetyPage() {
   const alerts = getCollection(data);
 
   return (
-    <AdminPageShell eyebrow="Admin Console" title="Safety Alerts" description="Review and resolve high-priority user safety escalations from journal risk detection.">
+    <AdminPageShell eyebrow="" title="Safety Alerts" description="Review and resolve high-priority user safety escalations from journal risk detection.">
       {error && <div className="mb-5 border border-amber-500/30 bg-amber-500/5 p-4 font-sans text-xs text-amber-700">{error}</div>}
       {loading ? <AdminTableSkeleton /> : alerts.length === 0 ? <AdminEmptyState title="No safety alerts" message="Open risk alerts will appear here when the admin safety API is connected." /> : (
         <div className="space-y-4">
@@ -45,6 +46,7 @@ export default function AdminSafetyPage() {
                   <div>
                     <p className="font-heading text-base font-semibold text-foreground">{alert.patient_name}</p>
                     <p className="font-sans text-xs text-muted-foreground">Created {formatDate(alert.created_at)}</p>
+                    {alert.guardian_contact && <p className="mt-1 font-sans text-xs text-muted-foreground">Guardian: {alert.guardian_contact}</p>}
                     {alert.excerpt && <p className="mt-3 max-w-2xl font-sans text-sm leading-relaxed text-muted-foreground">{alert.excerpt}</p>}
                   </div>
                 </div>

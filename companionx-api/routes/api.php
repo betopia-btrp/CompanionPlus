@@ -13,7 +13,6 @@ use App\Http\Controllers\Api\ExerciseController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\BlogController;
 use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\SessionNoteController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StripeWebhookController;
 
@@ -175,13 +174,9 @@ Route::middleware("auth:sanctum")->group(function () {
             ConsultantDashboardController::class,
             "updateProfile",
         ]);
-        Route::get("/consultant/session-notes/{bookingId}", [
-            SessionNoteController::class,
-            "show",
-        ]);
-        Route::put("/consultant/session-notes/{bookingId}", [
-            SessionNoteController::class,
-            "update",
+        Route::post("/bookings/{bookingId}/complete-session", [
+            BookingFlowController::class,
+            "completeSession",
         ]);
         Route::post("/consultant/overrides", [
             ConsultantDashboardController::class,

@@ -44,17 +44,17 @@ export default function LoginPage() {
         <div className="relative w-full max-w-140 border border-border bg-card p-8 md:p-10">
           <div className="mb-8">
             <h1 className="font-heading text-3xl font-bold text-foreground md:text-[34px]">
-              Access Your Anonymous Account
+              Sign In to CompanionX
             </h1>
             <p className="mt-2 font-sans text-sm text-muted-foreground">
-              Continue securely to your private wellness dashboard.
+              Access your account to continue.
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="font-sans text-muted-foreground">
-                Clinical Email
+                Email Address
               </label>
               <Input
                 type="email"
@@ -65,7 +65,7 @@ export default function LoginPage() {
 
             <div>
               <label className="font-sans text-muted-foreground">
-                Secure Password
+                Password
               </label>
               <Input
                 type="password"

@@ -42,6 +42,7 @@ function Nav() {
             { label: "Features", href: "#features" },
             { label: "Stories", href: "#testimonials" },
             { label: "Pricing", href: "/pricing" },
+            { label: "For Consultants", href: "/register" },
           ].map((link) => (
             <a
               key={link.label}

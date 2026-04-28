@@ -7,6 +7,7 @@ export type AuthUser = {
   email: string;
   system_role: string;
   onboarding_completed?: boolean;
+  is_approved?: boolean;
   subscription_plan?: {
     id: number;
     name: string;
@@ -33,6 +34,7 @@ export type RegisterPayload = {
   dob: string;
   gender: string;
   guardian_contact?: string;
+  system_role?: string;
 };
 
 export async function ensureCsrfCookie() {

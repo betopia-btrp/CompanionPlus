@@ -52,7 +52,20 @@ class AvailabilityService
                         break;
                     }
                 }
+
                 if ($coveredByTemplate) {
+                    $overlapsBlocked = $overrides->where('type', 'blocked')->contains(fn ($blocked) =>
+                        $o->start_datetime->lt($blocked->end_datetime) && $o->end_datetime->gt($blocked->start_datetime)
+                    );
+                    if ($overlapsBlocked) {
+                        $subs = $this->subtractOccupied($o->start_datetime, $o->end_datetime, $bookings, collect());
+                        foreach ($subs as $r) {
+                            $windows[] = [
+                                'start_datetime' => $r['start']->toISOString(),
+                                'end_datetime' => $r['end']->toISOString(),
+                            ];
+                        }
+                    }
                     continue;
                 }
 

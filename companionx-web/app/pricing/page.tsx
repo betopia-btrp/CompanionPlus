@@ -34,7 +34,6 @@ const FEATURE_LABELS: Record<string, string> = {
   free_sessions: "Free Sessions Per Month",
   max_available_hours_per_month: "Available Hours Per Month",
   platform_fee_percentage: "Platform Fee",
-  includes_analytics: "Analytics Dashboard",
 };
 
 function formatFeatureValue(key: string, value: boolean | number | null): string {

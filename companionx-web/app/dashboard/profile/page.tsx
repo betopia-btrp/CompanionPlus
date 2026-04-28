@@ -133,7 +133,6 @@ export default function ProfilePage() {
       ? {
           max_available_hours_per_month: "Available Hours Per Month",
           platform_fee_percentage: "Platform Fee",
-          includes_analytics: "Analytics Dashboard",
         }
       : {};
 
@@ -170,7 +169,7 @@ export default function ProfilePage() {
 
         <div className="space-y-6">
           {/* Plan card */}
-          <div className="border border-border bg-card">
+          {user?.system_role !== "admin" && <div className="border border-border bg-card">
             <div className={`h-1 ${isPremium ? "bg-amber-500" : "bg-primary"}`} />
             <div className="p-8">
               <div className="flex items-start justify-between mb-7">
@@ -259,7 +258,7 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Personal Information */}
           <div className="border border-border bg-card p-6">

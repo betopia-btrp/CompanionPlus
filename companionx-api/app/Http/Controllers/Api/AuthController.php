@@ -43,9 +43,13 @@ class AuthController extends Controller
         ]);
 
         if ($systemRole === 'consultant') {
-            ConsultantProfile::firstOrCreate([
-                'user_id' => $user->id,
-            ]);
+            ConsultantProfile::firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'specialization' => 'General Counseling',
+                    'base_rate_bdt' => 0,
+                ]
+            );
         }
 
         $plan = SubscriptionPlan::where('name', 'Free')
@@ -108,12 +112,14 @@ class AuthController extends Controller
         $user = $request->user()->load([
             'subscriptionPlan',
             'activeSubscription',
+            'consultantProfile',
         ]);
 
         return response()->json([
             ...$user->toArray(),
             'active_subscription' => $user->activeSubscription()->exists(),
             'free_sessions_remaining' => $user->activeSubscription?->free_sessions_remaining ?? 0,
+            'is_approved' => $user->consultantProfile?->is_approved ?? null,
         ]);
     }
 }

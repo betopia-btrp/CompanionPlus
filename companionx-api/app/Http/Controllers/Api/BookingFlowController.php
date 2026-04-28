@@ -240,7 +240,7 @@ class BookingFlowController extends Controller
                         : $patientRef,
                     'subtitle' => $isPatient
                         ? ($b->consultant?->specialization ?? '')
-                        : $patientRef,
+                        : null,
                     'status' => $b->status,
                     'scheduled_start' => $b->scheduled_start?->toISOString(),
                     'scheduled_end' => $b->scheduled_end?->toISOString(),
@@ -263,4 +263,24 @@ class BookingFlowController extends Controller
         ]);
     }
 
+    public function completeSession(Request $request, int $bookingId)
+    {
+        $user = $request->user();
+
+        $booking = Booking::where('id', $bookingId)
+            ->where('consultant_id', $user->id)
+            ->firstOrFail();
+
+        if ($booking->status !== 'confirmed') {
+            return response()->json([
+                'message' => 'Only confirmed sessions can be completed.',
+            ], 422);
+        }
+
+        $booking->update(['status' => 'completed']);
+
+        return response()->json([
+            'message' => 'Session completed.',
+        ]);
+    }
 }
