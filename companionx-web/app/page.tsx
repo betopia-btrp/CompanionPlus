@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
-import JournalMockup from "@/components/journal-mockup";
+import TiltedCards from "@/components/tilted-cards";
 import {
   Fingerprint,
   CalendarBlank,
@@ -134,9 +134,6 @@ function Hero() {
             </Button>
           </div>
         </div>
-
-        {/* Right — journal mockup */}
-        <JournalMockup />
       </div>
     </section>
   );

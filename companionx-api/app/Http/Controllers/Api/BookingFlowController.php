@@ -156,6 +156,18 @@ class BookingFlowController extends Controller
             ->where('patient_id', $user->id)
             ->firstOrFail();
 
+        if (in_array($booking->status, ['confirmed', 'completed'])) {
+            return response()->json([
+                'message' => 'Booking already confirmed.',
+                'booking' => [
+                    'id' => $booking->id,
+                    'scheduled_start' => $booking->scheduled_start->toISOString(),
+                    'scheduled_end' => $booking->scheduled_end->toISOString(),
+                    'status' => $booking->status,
+                ],
+            ]);
+        }
+
         $consultant = $booking->consultant;
 
         $plan = $consultant?->user?->subscriptionPlan;
@@ -166,6 +178,12 @@ class BookingFlowController extends Controller
         $consultantNet = $totalAmount - $platformFee;
 
         DB::transaction(function () use ($booking, $consultant, $user, $session, $totalAmount, $platformFee, $consultantNet) {
+            $lockedBooking = Booking::where('id', $booking->id)->lockForUpdate()->first();
+
+            if (in_array($lockedBooking->status, ['confirmed', 'completed'])) {
+                return;
+            }
+
             $booking->update(['status' => 'confirmed']);
 
             $consultant->increment('balance_bdt', $consultantNet);
@@ -221,6 +239,7 @@ class BookingFlowController extends Controller
             ->with([
                 'consultant.user:id,first_name,last_name',
                 'patient:id,first_name,last_name',
+                'review',
             ])
             ->orderBy('scheduled_start', 'desc')
             ->paginate(20, ['*'], 'page', $page);
@@ -252,6 +271,11 @@ class BookingFlowController extends Controller
                         ->where('consultant_id', $b->consultant_id)
                         ->where('id', '<', $b->id)
                         ->doesntExist(),
+                    'review' => $b->relationLoaded('review') && $b->review ? [
+                        'id' => $b->review->id,
+                        'rating' => $b->review->rating,
+                        'comment' => $b->review->comment,
+                    ] : null,
                 ];
             })->values(),
             'meta' => [

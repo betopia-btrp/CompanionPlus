@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
@@ -121,9 +121,11 @@ export default function ConsultantBookingPage() {
   }, []);
 
   const sessionId = searchParams.get("session_id");
+  const processedSession = useRef<string | null>(null);
 
   useEffect(() => {
-    if (sessionId && !completeLoading) {
+    if (sessionId && !completeLoading && processedSession.current !== sessionId) {
+      processedSession.current = sessionId;
       setCompleteLoading(true);
       api
         .post("/api/bookings/complete", {
@@ -131,19 +133,19 @@ export default function ConsultantBookingPage() {
         })
         .then(() => {
           toast.success("Payment successful! Your session is confirmed.");
-          router.push("/dashboard/bookings?tab=confirmed");
+          router.replace("/dashboard/bookings?tab=confirmed");
         })
         .catch(() => {
           toast.error("Payment verification failed. Please contact support.");
+          const url = new URL(window.location.href);
+          url.searchParams.delete("session_id");
+          router.replace(url.pathname);
         })
         .finally(() => {
           setCompleteLoading(false);
-          const url = new URL(window.location.href);
-          url.searchParams.delete("session_id");
-          window.history.replaceState({}, "", url.pathname);
         });
     }
-  }, [sessionId]);
+  }, [sessionId, completeLoading]);
 
   const events: RBCEvent[] = useMemo(() => {
     const slotEvents: RBCEvent[] = slots.map((slot) => ({
