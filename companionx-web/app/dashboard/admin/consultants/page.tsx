@@ -28,7 +28,7 @@ export default function AdminConsultantsPage() {
   const consultants = getCollection(data);
 
   return (
-    <AdminPageShell eyebrow="Admin Console" title="Consultants" description="Review consultant profiles, approval state, specialties, pricing, and marketplace readiness.">
+    <AdminPageShell eyebrow="" title="Consultants" description="Review consultant profiles, approval state, specialties, pricing, and marketplace readiness.">
       {error && <div className="mb-5 border border-amber-500/30 bg-amber-500/5 p-4 font-sans text-xs text-amber-700">{error}</div>}
       {loading ? <AdminTableSkeleton /> : consultants.length === 0 ? <AdminEmptyState title="No consultants found" message="Consultant profiles will appear here when the admin consultants API is connected." /> : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -50,7 +50,9 @@ export default function AdminConsultantsPage() {
                 <div><p className="font-sans text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Rating</p><p className="mt-1 font-sans text-sm text-foreground">{consultant.average_rating ?? "New"}</p></div>
               </div>
               <div className="mt-5 flex gap-2">
-                <button onClick={() => setApproval(consultant.id, true)} className="inline-flex items-center gap-2 border border-emerald-600 px-3 py-2 font-sans text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-600 hover:text-white"><CheckCircle size={14} />Approve</button>
+                {!consultant.is_approved && (
+                  <button onClick={() => setApproval(consultant.id, true)} className="inline-flex items-center gap-2 border border-emerald-600 px-3 py-2 font-sans text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-600 hover:text-white"><CheckCircle size={14} />Approve</button>
+                )}
                 <button onClick={() => setApproval(consultant.id, false)} className="inline-flex items-center gap-2 border border-rose-600 px-3 py-2 font-sans text-xs font-medium text-rose-600 transition-colors hover:bg-rose-600 hover:text-white"><XCircle size={14} />Suspend</button>
               </div>
             </div>

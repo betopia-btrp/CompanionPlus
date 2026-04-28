@@ -86,6 +86,12 @@ type RBCEvent = {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, "0");
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${h}:${m}`;
+});
+
 function formatTimeShort(d: Date) {
   return format(d, "h:mm a");
 }
@@ -131,8 +137,8 @@ export default function SchedulePage() {
 
   // Template modal
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [templateBlocks, setTemplateBlocks] = useState([
-    { day_of_week: 1, start_time: "09:00", end_time: "12:00" },
+  const [templateDays, setTemplateDays] = useState([
+    { day_of_week: 1, ranges: [{ start_time: "09:00", end_time: "12:00" }] },
   ]);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
@@ -187,7 +193,7 @@ export default function SchedulePage() {
 
     const windowEvents: RBCEvent[] = (data.windows ?? []).map((w, i) => ({
       id: `window-${i}`,
-      title: `${formatTimeShort(new Date(w.start_datetime))} – ${formatTimeShort(new Date(w.end_datetime))}`,
+      title: "Available",
       start: new Date(w.start_datetime),
       end: new Date(w.end_datetime),
       resource: { type: "window" as const, status: "available" },
@@ -253,7 +259,7 @@ export default function SchedulePage() {
 
   const eventPropGetter = useCallback((event: RBCEvent) => {
     if (event.resource.type === "booking") {
-      return { className: "!bg-primary/15 !border-primary/40 !text-primary !border !rounded-none !text-xs" };
+      return { className: "!bg-violet-500/15 !border-violet-500/40 !text-violet-700 !border !rounded-none !text-xs" };
     }
     if (event.resource.type === "override") {
       return { className: "!bg-red-500/10 !border-red-500/40 !text-red-700 !border !rounded-none !text-xs" };
@@ -277,33 +283,116 @@ export default function SchedulePage() {
   );
 
   // Template handlers
-  const addTemplateBlock = useCallback(() => {
-    setTemplateBlocks((prev) => [
-      ...prev,
-      { day_of_week: 1, start_time: "09:00", end_time: "12:00" },
-    ]);
-  }, []);
+  const handleDayTimeClick = useCallback((day: number, time: string) => {
+    setTemplateDays((prev) => {
+      const dayEntry = prev.find((d) => d.day_of_week === day);
+      if (!dayEntry) return prev;
 
-  const removeTemplateBlock = useCallback((index: number) => {
-    setTemplateBlocks((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+      const pendingIdx = dayEntry.ranges.findIndex((r) => r.start_time && !r.end_time);
 
-  const updateTemplateBlock = useCallback(
-    (index: number, field: string, value: string | number) => {
-      setTemplateBlocks((prev) =>
-        prev.map((block, i) =>
-          i === index ? { ...block, [field]: value } : block,
-        ),
+      if (pendingIdx >= 0) {
+        const pending = dayEntry.ranges[pendingIdx];
+        if (pending.start_time === time) {
+          return prev.map((d) =>
+            d.day_of_week === day
+              ? { ...d, ranges: d.ranges.filter((_, i) => i !== pendingIdx) }
+              : d,
+          );
+        }
+        const startIdx = TIME_OPTIONS.indexOf(pending.start_time);
+        const clickIdx = TIME_OPTIONS.indexOf(time);
+        if (clickIdx < startIdx) {
+          return prev.map((d) =>
+            d.day_of_week === day
+              ? { ...d, ranges: d.ranges.map((r, i) => i === pendingIdx ? { start_time: time, end_time: pending.start_time } : r) }
+              : d,
+          );
+        }
+        return prev.map((d) =>
+          d.day_of_week === day
+            ? { ...d, ranges: d.ranges.map((r, i) => i === pendingIdx ? { ...r, end_time: time } : r) }
+            : d,
+        );
+      }
+
+      const hitRangeIdx = dayEntry.ranges.findIndex(
+        (r) => r.start_time && r.end_time && time >= r.start_time && time <= r.end_time,
       );
-    },
-    [],
-  );
+      if (hitRangeIdx >= 0) {
+        return prev.map((d) =>
+          d.day_of_week === day
+            ? { ...d, ranges: d.ranges.filter((_, i) => i !== hitRangeIdx) }
+            : d,
+        );
+      }
+
+      return prev.map((d) =>
+        d.day_of_week === day
+          ? { ...d, ranges: [...d.ranges, { start_time: time, end_time: "" }] }
+          : d,
+      );
+    });
+  }, []);
+
+  const addDay = useCallback(() => {
+    const usedDays = new Set(templateDays.map((d) => d.day_of_week));
+    for (let d = 0; d < 7; d++) {
+      if (!usedDays.has(d)) {
+        setTemplateDays((prev) => [
+          ...prev,
+          { day_of_week: d, ranges: [] },
+        ]);
+        return;
+      }
+    }
+  }, [templateDays]);
+
+  const removeDay = useCallback((day: number) => {
+    setTemplateDays((prev) => prev.filter((d) => d.day_of_week !== day));
+  }, []);
 
   const handleCreateTemplates = useCallback(async () => {
     setCreatingTemplate(true);
+    const existing = data?.templates ?? [];
     try {
-      for (const block of templateBlocks) {
-        await api.post("/api/consultant/templates", block);
+      const currentEntries: { day_of_week: number; start_time: string; end_time: string }[] = [];
+      for (const day of templateDays) {
+        for (const range of day.ranges) {
+          if (range.start_time && range.end_time) {
+            currentEntries.push({ day_of_week: day.day_of_week, start_time: range.start_time, end_time: range.end_time });
+          }
+        }
+      }
+
+      for (const existingTpl of existing) {
+        const stillPresent = currentEntries.some(
+          (e) =>
+            e.day_of_week === existingTpl.day_of_week &&
+            e.start_time === existingTpl.start_time &&
+            e.end_time === existingTpl.end_time,
+        );
+        if (!stillPresent) {
+          await api.delete(`/api/consultant/templates/${existingTpl.id}`);
+        }
+      }
+
+      for (const day of templateDays) {
+        for (const range of day.ranges) {
+          if (!range.start_time || !range.end_time) continue;
+          const alreadyExists = existing.some(
+            (t) =>
+              t.day_of_week === day.day_of_week &&
+              t.start_time === range.start_time &&
+              t.end_time === range.end_time,
+          );
+          if (!alreadyExists) {
+            await api.post("/api/consultant/templates", {
+              day_of_week: day.day_of_week,
+              start_time: range.start_time,
+              end_time: range.end_time,
+            });
+          }
+        }
       }
       setShowTemplateModal(false);
       setStatusMessage("Templates saved. Slots generated.");
@@ -314,7 +403,7 @@ export default function SchedulePage() {
     } finally {
       setCreatingTemplate(false);
     }
-  }, [templateBlocks, fetchSchedule]);
+  }, [templateDays, data?.templates, fetchSchedule]);
 
   const handleDeleteTemplate = useCallback(
     async (templateId: number) => {
@@ -377,9 +466,20 @@ export default function SchedulePage() {
               size="sm"
               className="text-xs font-medium"
               onClick={() => {
-                setTemplateBlocks([
-                  { day_of_week: 1, start_time: "09:00", end_time: "12:00" },
-                ]);
+                const grouped: Record<number, { start_time: string; end_time: string }[]> = {};
+                (data?.templates ?? []).forEach((t) => {
+                  if (!grouped[t.day_of_week]) grouped[t.day_of_week] = [];
+                  grouped[t.day_of_week].push({ start_time: t.start_time, end_time: t.end_time });
+                });
+                const days = Object.entries(grouped).map(([day, ranges]) => ({
+                  day_of_week: Number(day),
+                  ranges,
+                }));
+                setTemplateDays(
+                  days.length > 0
+                    ? days
+                    : [{ day_of_week: 1, ranges: [{ start_time: "09:00", end_time: "12:00" }] }],
+                );
                 setShowTemplateModal(true);
               }}
             >
@@ -404,18 +504,26 @@ export default function SchedulePage() {
               </span>
             </div>
             {data.max_hours !== null && data.max_hours !== undefined && (
-              <div className="flex-1 max-w-40 h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    (data.used_hours ?? 0) / data.max_hours > 0.8
-                      ? "bg-red-500"
-                      : (data.used_hours ?? 0) / data.max_hours > 0.6
-                        ? "bg-amber-500"
-                        : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${Math.min(100, ((data.used_hours ?? 0) / data.max_hours) * 100)}%` }}
-                />
-              </div>
+              <>
+                <div className="flex-1 max-w-40 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      (data.used_hours ?? 0) / data.max_hours > 0.8
+                        ? "bg-red-500"
+                        : (data.used_hours ?? 0) / data.max_hours > 0.6
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.min(100, ((data.used_hours ?? 0) / data.max_hours) * 100)}%` }}
+                  />
+                </div>
+                <button
+                  onClick={() => router.push("/pricing")}
+                  className="ml-auto font-sans text-xs font-medium text-primary hover:opacity-80 transition-opacity"
+                >
+                  Upgrade to Unlimited Hours
+                </button>
+              </>
             )}
           </div>
         )}
@@ -537,6 +645,48 @@ export default function SchedulePage() {
                     </Button>
                   </div>
                 </>
+              ) : selectedEvent.resource.type === "window" ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center border border-emerald-500/30 bg-emerald-500/10">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-emerald-600"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </span>
+                      <span className="font-sans text-sm font-medium text-foreground">
+                        Available
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-sans text-xs text-muted-foreground mb-1">
+                    {format(selectedEvent.start, "EEE, MMM d")}
+                  </p>
+                  <p className="font-sans text-sm font-medium text-foreground mb-5">
+                    {formatTimeShort(selectedEvent.start)} – {formatTimeShort(selectedEvent.end)}
+                  </p>
+                  <div className="flex gap-3">
+                    <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => setSelectedEvent(null)}>
+                      Close
+                    </Button>
+                    <Button size="sm" className="flex-1 text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10" variant="outline"
+                      onClick={async () => {
+                        try {
+                          await api.post("/api/consultant/overrides", {
+                            start_datetime: selectedEvent.start.toISOString(),
+                            end_datetime: selectedEvent.end.toISOString(),
+                            type: "blocked",
+                          });
+                          setSelectedEvent(null);
+                          setStatusMessage("Time blocked.");
+                          await fetchSchedule();
+                        } catch {
+                          setStatusMessage("Could not block time.");
+                        }
+                      }}>
+                      <Trash size={12} weight="bold" />
+                      Block
+                    </Button>
+                  </div>
+                </>
               ) : selectedEvent.resource.type === "booking" ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
@@ -575,7 +725,7 @@ export default function SchedulePage() {
                         className="flex-1 text-xs font-medium"
                         onClick={() =>
                           router.push(
-                            `/dashboard/room?room=${selectedEvent.resource.jitsiRoomUuid}`,
+                            `/dashboard/room?room=${selectedEvent.resource.jitsiRoomUuid}&bookingId=${selectedEvent.resource.bookingId}`,
                           )
                         }
                       >
@@ -638,73 +788,109 @@ export default function SchedulePage() {
               <h2 className="font-heading text-lg font-semibold text-foreground mb-2">
                 Weekly Templates
               </h2>
-              <p className="font-sans text-xs text-muted-foreground mb-4">
-                Define your recurring availability. Each block generates 30-min
-                slots for the next 4 weeks.
+              <p className="font-sans text-xs text-muted-foreground mb-5">
+                Click time slots to define ranges. Click a slot to start a range, click another to end it. Click an existing range to remove it.
               </p>
 
-              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                {templateBlocks.map((block, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 border border-border bg-muted/30 px-4 py-3"
-                  >
-                    <select
-                      value={block.day_of_week}
-                      onChange={(e) =>
-                        updateTemplateBlock(
-                          i,
-                          "day_of_week",
-                          Number(e.target.value),
-                        )
-                      }
-                      className="border border-border bg-background px-2 py-1.5 font-sans text-xs text-foreground"
-                    >
-                      {DAY_NAMES.map((name, idx) => (
-                        <option key={idx} value={idx}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      type="time"
-                      value={block.start_time}
-                      onChange={(e) =>
-                        updateTemplateBlock(i, "start_time", e.target.value)
-                      }
-                      className="w-28 text-xs"
-                    />
-                    <span className="font-sans text-xs text-muted-foreground">
-                      to
-                    </span>
-                    <Input
-                      type="time"
-                      value={block.end_time}
-                      onChange={(e) =>
-                        updateTemplateBlock(i, "end_time", e.target.value)
-                      }
-                      className="w-28 text-xs"
-                    />
-                    {templateBlocks.length > 1 && (
-                      <button
-                        onClick={() => removeTemplateBlock(i)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-4 mb-5 max-h-96 overflow-y-auto">
+                {templateDays
+                  .sort((a, b) => a.day_of_week - b.day_of_week)
+                  .map((dayEntry) => {
+                    const day = dayEntry.day_of_week;
+                    return (
+                      <div key={day} className="border border-border">
+                        <div className="flex items-center justify-between bg-muted/30 px-4 py-2 border-b border-border">
+                          <span className="font-heading text-sm font-semibold text-foreground">
+                            {DAY_NAMES[day]}
+                          </span>
+                          <button
+                            onClick={() => removeDay(day)}
+                            className="font-sans text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-4 max-h-48 overflow-y-auto gap-px bg-border p-px">
+                          {TIME_OPTIONS.map((t) => {
+                            const tIdx = TIME_OPTIONS.indexOf(t);
+
+                            const hitRange = dayEntry.ranges.find(
+                              (r) => r.start_time && r.end_time && t >= r.start_time && t <= r.end_time,
+                            );
+                            const isPendingStart = dayEntry.ranges.some(
+                              (r) => r.start_time === t && !r.end_time,
+                            );
+                            const isInRange = hitRange !== undefined;
+                            const isStart = hitRange ? hitRange.start_time === t : false;
+                            const isEnd = hitRange ? hitRange.end_time === t : false;
+                            const isHour = t.endsWith(":00");
+
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => handleDayTimeClick(day, t)}
+                                className={`font-mono text-[11px] py-1.5 text-center transition-colors ${
+                                  isPendingStart
+                                    ? "bg-amber-500 text-white font-semibold animate-pulse"
+                                    : isStart || isEnd
+                                      ? "bg-primary text-primary-foreground font-semibold"
+                                      : isInRange
+                                        ? "bg-primary/20 text-primary font-medium"
+                                        : isHour
+                                          ? "bg-card text-foreground hover:bg-muted"
+                                          : "bg-card text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {t}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {dayEntry.ranges.filter((r) => r.start_time && r.end_time).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 border-t border-border px-3 py-2">
+                            {dayEntry.ranges
+                              .filter((r) => r.start_time && r.end_time)
+                              .map((r, ri) => (
+                                <span
+                                  key={ri}
+                                  className="inline-flex items-center gap-1 border border-primary/30 bg-primary/5 px-2 py-0.5 font-sans text-[11px] text-primary"
+                                >
+                                  {r.start_time}–{r.end_time}
+                                  <button
+                                    onClick={() => {
+                                      setTemplateDays((prev) =>
+                                        prev.map((d) =>
+                                          d.day_of_week === day
+                                            ? { ...d, ranges: d.ranges.filter((_, i) => i !== ri) }
+                                            : d,
+                                        ),
+                                      );
+                                    }}
+                                    className="text-primary/60 hover:text-primary ml-0.5"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
 
               <Button
                 variant="outline"
                 size="sm"
-                className="mb-4 text-xs font-medium w-full"
-                onClick={addTemplateBlock}
+                className="mb-5 text-xs font-medium w-full"
+                onClick={addDay}
+                disabled={templateDays.length >= 7}
               >
                 <Plus size={14} weight="bold" />
-                Add Block
+                Add Day
               </Button>
 
               <div className="flex gap-3">

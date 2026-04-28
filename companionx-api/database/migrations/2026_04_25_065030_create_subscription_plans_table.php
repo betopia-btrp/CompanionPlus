@@ -34,7 +34,6 @@ return new class extends Migration {
                 "features" => json_encode([
                     "max_available_hours_per_month" => 10,
                     "platform_fee_percentage" => 10.0,
-                    "includes_analytics" => false,
                 ]),
                 "is_active" => true,
                 "sort_order" => 0,
@@ -49,7 +48,6 @@ return new class extends Migration {
                 "features" => json_encode([
                     "max_available_hours_per_month" => null,
                     "platform_fee_percentage" => 3.0,
-                    "includes_analytics" => true,
                 ]),
                 "is_active" => true,
                 "sort_order" => 1,

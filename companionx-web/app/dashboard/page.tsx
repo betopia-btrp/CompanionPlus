@@ -95,15 +95,6 @@ type BlogPost = {
   };
 };
 
-function getTimeUntil(iso: string, now: number = Date.now()) {
-  const diff = new Date(iso).getTime() - now;
-  if (diff < 0) return "00:00:00";
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const secs = Math.floor((diff % (1000 * 60)) / 1000);
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-}
-
 function getMoodLabel(score: number) {
   if (score >= 0.6) return "Elevated Resilience";
   if (score >= 0.2) return "Positive Trend";
@@ -128,15 +119,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [blogsLoading, setBlogsLoading] = useState(true);
   const router = useRouter();
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -311,8 +296,17 @@ export default function DashboardPage() {
                       <p className="font-sans text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase">
                         Starts In
                       </p>
-                      <p className="mt-0.5 font-mono text-lg font-medium text-foreground">
-                        {getTimeUntil(appointment.scheduled_start, now)}
+                      <p className="mt-0.5 font-heading text-lg font-medium text-foreground">
+                        {new Date(appointment.scheduled_start).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        ,{" "}
+                        {new Date(appointment.scheduled_start).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                     <div>
@@ -328,7 +322,7 @@ export default function DashboardPage() {
                   <Button
                     className="text-xs font-medium"
                     size="sm"
-                    onClick={() => router.push(`/dashboard/room?room=${appointment.jitsi_room_uuid}`)}
+                    onClick={() => router.push(`/dashboard/room?room=${appointment.jitsi_room_uuid}&bookingId=${appointment.id}`)}
                   >
                     Join Session Now
                     <ArrowRight size={14} weight="bold" />
@@ -505,7 +499,7 @@ export default function DashboardPage() {
                       {blog.title}
                     </h3>
                     <p className="font-sans text-xs leading-relaxed text-muted-foreground">
-                      {blog.excerpt || blog.content?.slice(0, 120) + (blog.content?.length > 120 ? "…" : "")}
+                      {blog.excerpt || blog.content?.slice(0, 120) + ((blog.content?.length ?? 0) > 120 ? "…" : "")}
                     </p>
                   </div>
                   <div className="flex items-center justify-between border-t border-border px-5 py-3">
@@ -808,7 +802,7 @@ function ConsultantDashboard() {
                             className="text-xs font-medium"
                             onClick={() =>
                               router.push(
-                                `/dashboard/room?room=${session.jitsi_room_uuid}`,
+                                `/dashboard/room?room=${session.jitsi_room_uuid}&bookingId=${session.id}`,
                               )
                             }
                           >

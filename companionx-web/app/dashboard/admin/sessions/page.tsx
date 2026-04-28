@@ -25,7 +25,7 @@ export default function AdminSessionsPage() {
   const sessions = getCollection(data);
 
   return (
-    <AdminPageShell eyebrow="Admin Console" title="Sessions" description="Track booking lifecycle, scheduled meetings, payments, and operational session status.">
+    <AdminPageShell eyebrow="" title="Sessions" description="Track booking lifecycle, scheduled meetings, payments, and operational session status.">
       {error && <div className="mb-5 border border-amber-500/30 bg-amber-500/5 p-4 font-sans text-xs text-amber-700">{error}</div>}
       {loading ? <AdminTableSkeleton /> : sessions.length === 0 ? <AdminEmptyState title="No sessions found" message="Bookings will appear here when the admin bookings API is connected." /> : (
         <div className="overflow-hidden border border-border bg-card">

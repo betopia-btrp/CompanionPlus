@@ -52,8 +52,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { user } = await register(formData);
-      router.push(user.onboarding_completed ? "/dashboard" : "/onboarding");
+      const { user } = await register({ ...formData, system_role: identity === "consultant" ? "consultant" : "patient" });
+      router.push(user.system_role === "consultant" ? "/dashboard" : user.onboarding_completed ? "/dashboard" : "/onboarding");
     } catch (error: unknown) {
       const axiosError = error as {
         response?: { data?: RegisterErrorResponse };
@@ -95,10 +95,10 @@ export default function RegisterPage() {
         <div className="relative w-full max-w-140 border border-border bg-card p-8 md:p-10">
           <div className="mb-8">
             <h1 className="font-heading text-3xl font-bold text-foreground md:text-[34px]">
-              Create Your Anonymous Account
+              Create Your Account
             </h1>
             <p className="mt-2 font-sans text-sm text-muted-foreground">
-              Protocol initialization for clinical session management.
+              Choose your role and fill in your details below.
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIdentity("consultant")}
+                  onClick={() => { setIdentity("consultant"); setFormData((prev) => ({ ...prev, guardian_contact: "" })); }}
                   className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-colors ${
                     identity === "consultant"
                       ? "bg-primary text-primary-foreground"
@@ -162,7 +162,7 @@ export default function RegisterPage() {
 
             <div>
               <label className="font-sans text-muted-foreground">
-                Clinical Email
+                Email Address
               </label>
               <Input
                 type="email"
@@ -284,6 +284,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {identity === "user" && (
             <div>
               <label className="font-sans text-muted-foreground">
                 Guardian Contact (Emergency)
@@ -296,6 +297,7 @@ export default function RegisterPage() {
                 }
               />
             </div>
+            )}
 
             <Button
               type="submit"

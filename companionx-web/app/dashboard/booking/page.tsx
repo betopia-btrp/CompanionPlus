@@ -77,14 +77,17 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     specialization: "",
-    max_rate: 5000,
+    max_rate: "",
   });
   const router = useRouter();
 
   useEffect(() => {
     let ignore = false;
+    const params: Record<string, string> = {};
+    if (filters.specialization) params.specialization = filters.specialization;
+    if (filters.max_rate) params.max_rate = filters.max_rate;
     api
-      .get("/api/consultants", { params: filters })
+      .get("/api/consultants", { params })
       .then((res) => {
         if (!ignore) setData(res.data);
       })
@@ -250,12 +253,13 @@ export default function BookingPage() {
                 <input
                   type="number"
                   placeholder="Max BDT"
+                  value={filters.max_rate}
                   className="w-20 font-sans text-xs text-foreground outline-none"
                   onChange={(e) => {
                     setLoading(true);
                     setFilters({
                       ...filters,
-                      max_rate: Number(e.target.value),
+                      max_rate: e.target.value,
                     });
                   }}
                 />

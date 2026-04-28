@@ -37,7 +37,7 @@ export default function AdminContentPage() {
   const posts = getCollection(data);
 
   return (
-    <AdminPageShell eyebrow="Admin Console" title="Content" description="Moderate Consultant's Corner articles before and after publication.">
+    <AdminPageShell eyebrow="" title="Content" description="Moderate Consultant's Corner articles before and after publication.">
       {error && <div className="mb-5 border border-amber-500/30 bg-amber-500/5 p-4 font-sans text-xs text-amber-700">{error}</div>}
       {loading ? <AdminTableSkeleton /> : posts.length === 0 ? <AdminEmptyState title="No posts found" message="Consultant content will appear here when the admin blogs API is connected." /> : (
         <div className="overflow-hidden border border-border bg-card">

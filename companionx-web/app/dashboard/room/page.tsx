@@ -4,22 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { fetchCurrentUser } from "@/lib/auth";
+import api from "@/lib/axios";
 import { VideoCamera, PhoneSlash, Spinner } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
 export default function RoomPage() {
   const searchParams = useSearchParams();
   const roomUuid = searchParams.get("room");
+  const bookingId = searchParams.get("bookingId");
   const router = useRouter();
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const jitsiApiRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const [isConsultant, setIsConsultant] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser().then((u) => {
       if (u) {
+        setIsConsultant(u.system_role === "consultant");
         const isPatient = u.system_role === "patient";
         if (isPatient) {
           const hash = u.id.toString(16).toUpperCase().padStart(4, "0").slice(-4);
@@ -30,6 +34,20 @@ export default function RoomPage() {
       }
     });
   }, []);
+
+  const endSession = async () => {
+    if (isConsultant && bookingId) {
+      try {
+        await api.post(`/api/bookings/${bookingId}/complete-session`);
+      } catch {
+        // silent
+      }
+    }
+    if (jitsiApiRef.current) {
+      jitsiApiRef.current.dispose();
+    }
+    router.push("/dashboard");
+  };
 
   useEffect(() => {
     if (!roomUuid || !userName || !jitsiContainerRef.current) return;
@@ -74,7 +92,7 @@ export default function RoomPage() {
       setLoading(false);
 
       api.addListener("readyToClose", () => {
-        router.push("/dashboard");
+        endSession();
       });
     };
 
@@ -88,7 +106,7 @@ export default function RoomPage() {
       const scriptEl = document.querySelector(`script[src="https://${domain}/external_api.js"]`);
       if (scriptEl) scriptEl.remove();
     };
-  }, [roomUuid, userName, router]);
+  }, [roomUuid, userName]);
 
   useEffect(() => {
     if (!roomUuid) return;
@@ -145,10 +163,7 @@ export default function RoomPage() {
           variant="outline"
           size="sm"
           className="text-xs font-medium border-destructive/40 text-destructive hover:bg-destructive/10"
-          onClick={() => {
-            if (jitsiApiRef.current) jitsiApiRef.current.dispose();
-            router.push("/dashboard");
-          }}
+          onClick={endSession}
         >
           <PhoneSlash size={14} weight="bold" />
           End Session

@@ -141,9 +141,6 @@ export default function ConsultantsCornerPage() {
         <header className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-sans text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                Consultant Tools
-              </p>
               <h1 className="font-heading text-xl font-semibold text-foreground">
                 Consultant&apos;s Corner
               </h1>

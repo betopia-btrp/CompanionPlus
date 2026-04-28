@@ -117,7 +117,7 @@ class AdminController extends Controller
     public function safetyAlerts()
     {
         $alerts = SafetyAlert::with([
-                'patient:id,first_name,last_name',
+                'patient:id,first_name,last_name,guardian_contact',
                 'journal:id,text_note',
             ])
             ->orderByRaw("CASE WHEN status = 'resolved' THEN 1 ELSE 0 END")
@@ -208,6 +208,7 @@ class AdminController extends Controller
         $payload = [
             'id' => $alert->id,
             'patient_name' => $this->formatUserName($alert->patient),
+            'guardian_contact' => $alert->patient?->guardian_contact,
             'severity' => $alert->severity,
             'status' => $alert->status,
             'created_at' => $alert->created_at,

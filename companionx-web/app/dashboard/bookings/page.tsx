@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/axios";
 import { fetchCurrentUser } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   VideoCamera,
   Check,
   X,
   ArrowRight,
+  Star,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -83,7 +84,9 @@ function getStatusStyle(status: string) {
 }
 
 export default function BookingsPage() {
-  const [activeTab, setActiveTab] = useState("pending");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabParam || "pending");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,6 +94,8 @@ export default function BookingsPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [verifyLoading, setVerifyLoading] = useState<number | null>(null);
   const [isConsultant, setIsConsultant] = useState(false);
+  const [reviewModal, setReviewModal] = useState<{ bookingId: number; rating: number; comment: string } | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -165,6 +170,25 @@ export default function BookingsPage() {
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (!reviewModal) return;
+    setReviewLoading(true);
+    try {
+      await api.post("/api/reviews", {
+        booking_id: reviewModal.bookingId,
+        rating: reviewModal.rating,
+        comment: reviewModal.comment,
+      });
+      toast.success("Review submitted!");
+      setReviewModal(null);
+      await fetchBookings();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not submit review.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
@@ -184,7 +208,12 @@ export default function BookingsPage() {
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                setActiveTab(tab.key);
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("tab", tab.key);
+                router.replace(`?${params.toString()}`);
+              }}
               className={`flex-1 px-4 py-2.5 font-sans text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-primary text-primary-foreground"
@@ -294,20 +323,22 @@ export default function BookingsPage() {
                       size="sm"
                       className="text-xs font-medium"
                       onClick={() =>
-                        router.push(`/dashboard/room?room=${booking.jitsi_room_uuid}`)
+                        router.push(`/dashboard/room?room=${booking.jitsi_room_uuid}&bookingId=${booking.id}`)
                       }
                     >
                       <VideoCamera size={14} weight="bold" />
                       Join Session
                     </Button>
                   )}
-                  {booking.status === "completed" && (
+                  {booking.status === "completed" && !isConsultant && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="text-xs font-medium"
+                      onClick={() => setReviewModal({ bookingId: booking.id, rating: 5, comment: "" })}
                     >
-                      View Notes
+                      <Star size={14} weight="bold" />
+                      Write Review
                     </Button>
                   )}
                 </div>
@@ -338,6 +369,48 @@ export default function BookingsPage() {
             >
               <ArrowRight size={14} />
             </Button>
+          </div>
+        )}
+
+        {/* ── Review Modal ──────────────────────────────────────────── */}
+        {reviewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !reviewLoading && setReviewModal(null)}>
+            <div className="w-full max-w-sm border border-border bg-card p-6" onClick={(e) => e.stopPropagation()}>
+              <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
+                Write a Review
+              </h2>
+              <div className="mb-5 flex items-center justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setReviewModal({ ...reviewModal, rating: star })}
+                    className="transition-colors hover:scale-110"
+                  >
+                    <Star
+                      size={28}
+                      weight={star <= reviewModal.rating ? "fill" : "regular"}
+                      className={star <= reviewModal.rating ? "text-amber-500" : "text-muted-foreground"}
+                    />
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={reviewModal.comment}
+                onChange={(e) => setReviewModal({ ...reviewModal, comment: e.target.value })}
+                placeholder="Share your experience (optional)"
+                rows={4}
+                className="mb-5 w-full border border-border bg-background px-4 py-3 font-sans text-sm text-foreground outline-none resize-none focus:border-primary transition-colors"
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => setReviewModal(null)} disabled={reviewLoading}>
+                  Cancel
+                </Button>
+                <Button size="sm" className="flex-1 text-xs font-medium" onClick={handleSubmitReview} disabled={reviewLoading}>
+                  {reviewLoading ? "Submitting..." : "Submit Review"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

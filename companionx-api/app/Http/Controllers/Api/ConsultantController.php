@@ -91,8 +91,10 @@ class ConsultantController extends Controller
             ])
             ->firstOrFail();
 
-        $rangeStart = Carbon::today();
-        $rangeEnd = Carbon::today()->addWeeks(4)->endOfDay();
+        $rangeStart = $request->has('start_date') ? Carbon::parse($request->start_date) : Carbon::today();
+        $rangeEnd = $request->has('end_date') ? Carbon::parse($request->end_date)->endOfDay() : Carbon::today()->addWeeks(4)->endOfDay();
+
+        $windows = $availabilityService->computeWindows($consultant->user_id, $rangeStart, $rangeEnd);
 
         $windows = $availabilityService->computeWindows($consultant->user_id, $rangeStart, $rangeEnd);
 

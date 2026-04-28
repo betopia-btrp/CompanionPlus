@@ -196,10 +196,31 @@ class ConsultantDashboardController extends Controller
         $startUtc = Carbon::parse($validated['start_time'], 'Asia/Dhaka')->setTimezone('UTC');
         $endUtc = Carbon::parse($validated['end_time'], 'Asia/Dhaka')->setTimezone('UTC');
 
-        $template = AvailabilityTemplate::updateOrCreate(
-            ['consultant_id' => $profile->user_id, 'day_of_week' => $validated['day_of_week']],
-            ['start_time' => $startUtc->format('H:i'), 'end_time' => $endUtc->format('H:i')]
-        );
+        $existing = AvailabilityTemplate::where([
+            'consultant_id' => $profile->user_id,
+            'day_of_week' => $validated['day_of_week'],
+            'start_time' => $startUtc->format('H:i'),
+            'end_time' => $endUtc->format('H:i'),
+        ])->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'Template already exists.',
+                'template' => [
+                    'id' => $existing->id,
+                    'day_of_week' => $existing->day_of_week,
+                    'start_time' => (string) $existing->start_time,
+                    'end_time' => (string) $existing->end_time,
+                ],
+            ], 200);
+        }
+
+        $template = AvailabilityTemplate::create([
+            'consultant_id' => $profile->user_id,
+            'day_of_week' => $validated['day_of_week'],
+            'start_time' => $startUtc->format('H:i'),
+            'end_time' => $endUtc->format('H:i'),
+        ]);
 
         return response()->json([
             'message' => 'Template saved.',
