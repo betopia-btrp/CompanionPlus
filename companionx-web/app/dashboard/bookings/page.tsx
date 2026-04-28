@@ -25,6 +25,11 @@ type Booking = {
   jitsi_room_uuid: string;
   stripe_session_id: string | null;
   is_first_time: boolean;
+  review: {
+    id: number;
+    rating: number;
+    comment: string | null;
+  } | null;
 };
 
 type Meta = {
@@ -95,6 +100,7 @@ export default function BookingsPage() {
   const [verifyLoading, setVerifyLoading] = useState<number | null>(null);
   const [isConsultant, setIsConsultant] = useState(false);
   const [reviewModal, setReviewModal] = useState<{ bookingId: number; rating: number; comment: string } | null>(null);
+  const [isEditReview, setIsEditReview] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const router = useRouter();
 
@@ -181,6 +187,7 @@ export default function BookingsPage() {
       });
       toast.success("Review submitted!");
       setReviewModal(null);
+      setIsEditReview(false);
       await fetchBookings();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Could not submit review.");
@@ -335,10 +342,17 @@ export default function BookingsPage() {
                       variant="outline"
                       size="sm"
                       className="text-xs font-medium"
-                      onClick={() => setReviewModal({ bookingId: booking.id, rating: 5, comment: "" })}
+                      onClick={() => {
+                        setReviewModal({
+                          bookingId: booking.id,
+                          rating: booking.review?.rating ?? 5,
+                          comment: booking.review?.comment ?? "",
+                        });
+                        setIsEditReview(!!booking.review);
+                      }}
                     >
-                      <Star size={14} weight="bold" />
-                      Write Review
+                      <Star size={14} weight={booking.review ? "fill" : "regular"} />
+                      {booking.review ? "Edit Review" : "Write Review"}
                     </Button>
                   )}
                 </div>
@@ -374,10 +388,10 @@ export default function BookingsPage() {
 
         {/* ── Review Modal ──────────────────────────────────────────── */}
         {reviewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !reviewLoading && setReviewModal(null)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !reviewLoading && (setReviewModal(null), setIsEditReview(false))}>
             <div className="w-full max-w-sm border border-border bg-card p-6" onClick={(e) => e.stopPropagation()}>
               <h2 className="font-heading text-lg font-semibold text-foreground mb-4">
-                Write a Review
+                {isEditReview ? "Edit Review" : "Write a Review"}
               </h2>
               <div className="mb-5 flex items-center justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -403,7 +417,7 @@ export default function BookingsPage() {
                 className="mb-5 w-full border border-border bg-background px-4 py-3 font-sans text-sm text-foreground outline-none resize-none focus:border-primary transition-colors"
               />
               <div className="flex gap-3">
-                <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => setReviewModal(null)} disabled={reviewLoading}>
+                <Button variant="outline" size="sm" className="flex-1 text-xs font-medium" onClick={() => { setReviewModal(null); setIsEditReview(false); }} disabled={reviewLoading}>
                   Cancel
                 </Button>
                 <Button size="sm" className="flex-1 text-xs font-medium" onClick={handleSubmitReview} disabled={reviewLoading}>

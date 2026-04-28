@@ -31,13 +31,15 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Can only review completed sessions.'], 422);
         }
 
-        $review = Review::create([
-            'booking_id' => $booking->id,
-            'patient_id' => $user->id,
-            'consultant_id' => $booking->consultant_id,
-            'rating' => $validated['rating'],
-            'comment' => $validated['comment'] ?? null,
-        ]);
+        $review = Review::updateOrCreate(
+            ['booking_id' => $booking->id],
+            [
+                'patient_id' => $user->id,
+                'consultant_id' => $booking->consultant_id,
+                'rating' => $validated['rating'],
+                'comment' => $validated['comment'] ?? null,
+            ]
+        );
 
         $this->recalculateAverageRating($booking->consultant_id);
 
