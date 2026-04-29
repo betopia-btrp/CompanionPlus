@@ -48,7 +48,7 @@ cp .env.example .env
 # Edit .env: set DB_HOST=127.0.0.1, DB credentials, STRIPE_KEY, STRIPE_SECRET, and GEMINI_API_KEY
 composer install
 php artisan key:generate
-php artisan migrate --seed
+php artisan migrate:fresh --seed
 php artisan stripe:sync-prices
 php -S localhost:8000 -t public   # port 8000
 
