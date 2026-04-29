@@ -4,13 +4,14 @@ AI-Powered Mental Wellness Platform — anonymous booking, mood journaling, AI e
 
 ## Quick Start
 
-**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Engine (Linux)
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Engine (Linux) — make sure it's running before proceeding.
 
 ```bash
 git clone <repo-url>
 cd CompanionPlus
 cp companionx-api/.env.example companionx-api/.env
 cp companionx-web/.env.example companionx-web/.env
+# Set STRIPE_KEY, STRIPE_SECRET, and GEMINI_API_KEY in companionx-api/.env (required)
 docker compose up --build
 ```
 
@@ -34,16 +35,25 @@ On first run, the entrypoint automatically: waits for PostgreSQL, generates `APP
 
 If you prefer running natively, you need PHP 8.3+, Composer, Node.js 22+, and PostgreSQL 15.
 
+Make sure PostgreSQL is running and create the database matching your `.env`:
+```bash
+createdb companionx
+# or: psql -c "CREATE DATABASE companionx;"
+```
+
 ```bash
 # Backend
 cd companionx-api
-cp .env.example .env              # edit DB credentials
+cp .env.example .env
+# Edit .env: set DB_HOST=127.0.0.1, DB credentials, STRIPE_KEY, STRIPE_SECRET, and GEMINI_API_KEY
 composer install
 php artisan key:generate
 php artisan migrate --seed
-php artisan serve                 # port 8000
+php artisan stripe:sync-prices
+php -S localhost:8000 -t public   # port 8000
 
 # Queue (separate terminal)
+cd companionx-api
 php artisan queue:work --tries=3
 
 # Frontend (separate terminal)

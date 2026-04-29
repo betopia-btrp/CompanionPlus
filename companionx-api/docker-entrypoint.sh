@@ -15,11 +15,6 @@ if [ ! -f vendor/autoload.php ]; then
     composer install --no-interaction
 fi
 
-if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null; then
-    echo "==> Generating APP_KEY..."
-    php artisan key:generate --force
-fi
-
 if [ "${SKIP_MIGRATIONS:-}" != "true" ]; then
     echo "==> Running migrations..."
     php artisan migrate --force
